@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f0f1a">
+    <title>DM Stock Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@zxing/browser@latest"></script>
+    <style>
+        :root{--bg:#0f0f1a;--card:#1a1a2e;--border:#2d2d4a;--accent:#e94560;--accent-glow:rgba(233,69,96,0.15);--success:#4ade80;--success-glow:rgba(74,222,128,0.15);--warning:#fbbf24;--text:#eaeaea;--text-muted:#8892b0;--text-dim:#5a6078}
+        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+        html,body{height:100%;overflow:hidden}
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+        .app{height:100%;display:flex;flex-direction:column}
+        .header{flex-shrink:0;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+        .header-left{display:flex;align-items:center;gap:10px}
+        .back-btn{background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;padding:8px;display:none;align-items:center;justify-content:center}
+        .back-btn.visible{display:flex}
+        .header-title{font-weight:600;font-size:17px}
+        .header-user{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--text-muted);cursor:pointer}
+        .content{flex:1;overflow-y:auto;padding:16px;padding-bottom:100px;-webkit-overflow-scrolling:touch}
+        .screen{display:none}
+        .screen.active{display:block}
+        .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;padding:8px 0;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+        .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;cursor:pointer;color:var(--text-muted);border:none;background:none;font-family:inherit}
+        .nav-item.active{color:var(--accent)}
+        .nav-icon{font-size:22px}
+        .nav-label{font-size:10px;font-weight:500}
+        .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid var(--border)}
+        .section-title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px;font-weight:600}
+        .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+        .quick-action{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 16px;text-align:center;cursor:pointer;transition:transform 0.1s}
+        .quick-action:active{transform:scale(0.97)}
+        .quick-action-icon{font-size:36px;margin-bottom:10px}
+        .quick-action-title{font-weight:600;font-size:16px;margin-bottom:4px}
+        .quick-action-sub{font-size:12px;color:var(--text-muted)}
+        .stats-row{display:flex;gap:12px;margin-bottom:20px}
+        .stat-card{flex:1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+        .stat-value{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace}
+        .stat-value.accent{color:var(--accent)}
+        .stat-value.success{color:var(--success)}
+        .stat-label{font-size:11px;color:var(--text-muted);margin-top:4px}
+        .search-container{position:relative;margin-bottom:12px}
+        .search-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px 14px 44px;color:var(--text);font-size:15px;font-family:inherit;outline:none}
+        .search-input:focus{border-color:var(--accent)}
+        .search-input::placeholder{color:var(--text-dim)}
+        .search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--text-muted)}
+        .filter-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;-webkit-overflow-scrolling:touch}
+        .filter-pill{padding:8px 14px;border-radius:20px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:inherit;white-space:nowrap;background:var(--bg);color:var(--text-muted)}
+        .filter-pill.active{background:var(--accent);color:white}
+        .results-count{font-size:12px;color:var(--text-muted);margin-bottom:12px}
+        .product-list{display:flex;flex-direction:column;gap:8px}
+        .product-item{background:var(--card);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid var(--border)}
+        .product-item:active{background:var(--border)}
+        .product-icon{width:44px;height:44px;background:var(--bg);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden}
+        .product-icon img{width:100%;height:100%;object-fit:cover}
+        .product-info{flex:1;min-width:0}
+        .product-name{font-size:14px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .product-meta{font-size:12px;color:var(--text-muted);display:flex;gap:8px}
+        .product-stock{font-weight:600;font-family:'JetBrains Mono',monospace;font-size:14px;min-width:32px;text-align:right}
+        .product-stock.low{color:var(--accent)}
+        .product-stock.ok{color:var(--success)}
+        .scanner-box{background:var(--bg);border-radius:16px;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin-bottom:16px;overflow:hidden;position:relative;border:2px dashed var(--border)}
+        .scanner-box.active{border-style:solid;border-color:var(--accent)}
+        #scannerReader{width:100%;height:100%}
+        #scannerReader video{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:14px}
+        #scannerReader img[alt="Info icon"]{display:none!important}
+        #qr-shaded-region{border-radius:8px!important}
+        .scanner-video{width:100%;height:100%;object-fit:cover}
+        .scanner-overlay{position:absolute;width:70%;height:50%;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,0.5)}
+        .scanner-line{position:absolute;width:100%;height:2px;background:var(--accent);animation:scan 2s ease-in-out infinite}
+        @keyframes scan{0%,100%{top:20%}50%{top:80%}}
+        .scanner-placeholder{text-align:center;color:var(--text-muted)}
+        .scanner-placeholder-icon{font-size:48px;margin-bottom:12px}
+        .input-row{display:flex;gap:10px}
+        .input-field{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-size:15px;font-family:'JetBrains Mono',monospace;outline:none}
+        .input-field:focus{border-color:var(--accent)}
+        .input-field::placeholder{color:var(--text-dim);font-family:'Inter',sans-serif}
+        .select-field{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-size:15px;font-family:inherit;outline:none;appearance:none;cursor:pointer}
+        .btn{padding:14px 20px;border-radius:12px;border:none;font-weight:600;cursor:pointer;font-size:14px;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform 0.1s}
+        .btn:active{transform:scale(0.97)}
+        .btn-primary{background:var(--accent);color:white}
+        .btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+        .btn-success{background:var(--success);color:#000}
+        .btn-full{width:100%}
+        .product-header{display:flex;gap:16px;margin-bottom:16px}
+        .product-image{width:80px;height:80px;background:var(--bg);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;overflow:hidden}
+        .product-image img{width:100%;height:100%;object-fit:cover}
+        .product-detail-name{font-size:18px;font-weight:700;margin-bottom:4px;line-height:1.3}
+        .product-detail-category{font-size:13px;color:var(--accent);margin-bottom:4px}
+        .product-detail-barcode{font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+        .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+        .stat-box{background:var(--bg);border-radius:10px;padding:12px;text-align:center}
+        .stat-box-value{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace}
+        .stat-box-value.price{color:var(--success)}
+        .stat-box-value.stock{color:var(--warning)}
+        .stat-box-value.stock.low{color:var(--accent)}
+        .stat-box-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+        .quantity-section{margin:16px 0}
+        .quantity-control{display:flex;align-items:center;justify-content:center;gap:20px}
+        .quantity-btn{width:52px;height:52px;border-radius:50%;background:var(--bg);border:1px solid var(--border);font-size:24px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center}
+        .quantity-btn:active{background:var(--border)}
+        .quantity-value{font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;min-width:60px;text-align:center}
+        .quantity-unit{font-size:12px;color:var(--text-muted);text-align:center}
+        .action-buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+        .action-btn{padding:18px;border-radius:14px;border:none;font-weight:600;cursor:pointer;font-size:15px;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:6px}
+        .action-btn.out{background:linear-gradient(135deg,var(--accent),#ff6b9d);color:white}
+        .action-btn.in{background:linear-gradient(135deg,var(--success),#22d3ee);color:#000}
+        .action-btn-icon{font-size:24px}
+        .more-actions{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+        .more-action-btn{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:none;border:none;color:var(--text);cursor:pointer;font-size:14px;font-family:inherit;border-radius:10px}
+        .more-action-btn:active{background:var(--bg)}
+        .more-action-icon{font-size:18px;width:24px;text-align:center}
+        .history-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+        .history-item:last-child{border-bottom:none}
+        .history-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+        .history-icon.out{background:var(--accent-glow);color:var(--accent)}
+        .history-icon.in{background:var(--success-glow);color:var(--success)}
+        .history-info{flex:1}
+        .history-name{font-size:13px;font-weight:500}
+        .history-details{font-size:11px;color:var(--text-muted)}
+        .history-amount{font-weight:600;font-family:'JetBrains Mono',monospace}
+        .history-amount.out{color:var(--accent)}
+        .history-amount.in{color:var(--success)}
+        .log-card{background:var(--card);border-radius:12px;margin-bottom:12px;border:1px solid var(--border);overflow:hidden}
+        .log-header{display:flex;align-items:center;padding:14px;cursor:pointer}
+        .log-header:active{background:var(--bg)}
+        .log-info{flex:1}
+        .log-project{font-weight:600;font-size:14px}
+        .log-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+        .log-totals{text-align:right;margin-right:12px}
+        .log-total-cost{font-size:12px;color:var(--text-muted)}
+        .log-total-margin{font-size:14px;font-weight:600;color:var(--success)}
+        .log-chevron{font-size:16px;color:var(--text-muted)}
+        .log-details{display:none;padding:0 14px 14px;border-top:1px solid var(--border)}
+        .log-details.visible{display:block}
+        .log-item{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px}
+        .log-item:last-child{border-bottom:none}
+        .log-item-name{flex:1;font-size:13px}
+        .log-item-margin{display:flex;align-items:center;gap:4px}
+        .log-item-margin input{width:50px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;text-align:center}
+        .log-item-totals{text-align:right;min-width:70px}
+        .log-item-cost{font-size:11px;color:var(--text-muted)}
+        .log-item-price{font-size:13px;font-weight:600;color:var(--success)}
+        .form-group{margin-bottom:16px}
+        .form-label{font-size:12px;color:var(--text-muted);margin-bottom:6px;display:block}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .form-hint{font-size:11px;color:var(--text-dim);margin-top:4px}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;padding:20px;z-index:100}
+        .modal-overlay.visible{display:flex}
+        .modal-content{background:var(--card);border-radius:20px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto}
+        .modal-title{font-size:18px;font-weight:700;margin-bottom:16px;text-align:center}
+        .modal-buttons{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+        .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--border);padding:12px 20px;border-radius:12px;display:flex;align-items:center;gap:10px;opacity:0;transition:all 0.3s;z-index:200;pointer-events:none}
+        .toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+        .toast.error{border-color:var(--accent)}
+        .loading-overlay{position:fixed;inset:0;background:rgba(15,15,26,0.9);display:none;align-items:center;justify-content:center;z-index:300}
+        .loading-overlay.visible{display:flex}
+        .loading-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .setup-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center}
+        .setup-logo{font-size:64px;margin-bottom:16px}
+        .setup-title{font-size:24px;font-weight:700;margin-bottom:8px}
+        .setup-subtitle{font-size:14px;color:var(--text-muted);margin-bottom:32px}
+        .setup-card{background:var(--card);border-radius:20px;padding:24px;width:100%;max-width:360px}
+        .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
+        .empty-state-icon{font-size:48px;margin-bottom:12px;opacity:0.5}
+        .link-banner{background:var(--accent);color:white;padding:12px 16px;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;gap:12px}
+        .link-banner-text{flex:1}
+        .link-banner-title{font-weight:600;font-size:14px}
+        .link-banner-code{font-size:12px;opacity:0.9;font-family:'JetBrains Mono',monospace}
+        .link-banner-close{background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px}
+        /* Label format radio styling */
+        input[name="labelFormat"]:checked+span+span+span{color:var(--text)}
+        label:has(input[name="labelFormat"]:checked){border-color:var(--accent)!important}
+        label:has(input[name="labelFormat"]:not(:checked)){border-color:var(--border)!important}
+        /* Quagga viewport */
+        #scannerViewport{position:relative;width:100%;height:100%}
+        #scannerViewport video{width:100%;height:100%;object-fit:cover}
+        #scannerViewport canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+        .drawingBuffer{display:none}
+        /* Barcode confirmation */
+        .barcode-confirm{background:var(--card);border-radius:16px;padding:20px;text-align:center;margin-top:16px;border:2px solid var(--success)}
+        .barcode-confirm-label{font-size:12px;color:var(--text-muted);margin-bottom:8px}
+        .barcode-confirm-value{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--success);margin-bottom:16px;word-break:break-all}
+        .barcode-confirm-buttons{display:flex;gap:12px}
+        .barcode-confirm-buttons .btn{flex:1}
+        .scan-status{text-align:center;padding:12px;font-size:13px;color:var(--text-muted)}
+        .scan-status.detecting{color:var(--warning)}
+        .scan-status.found{color:var(--success)}
+        /* OCR Styles */
+        .ocr-section{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+        .ocr-btn{width:100%;padding:16px;background:var(--card);border:2px dashed var(--border);border-radius:12px;color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+        .ocr-btn:active{background:var(--bg)}
+        .ocr-btn.processing{border-color:var(--warning);animation:pulse 1.5s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+        .ocr-results{margin-top:12px;background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden}
+        .ocr-result-item{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px}
+        .ocr-result-item:last-child{border-bottom:none}
+        .ocr-result-item:active{background:var(--bg)}
+        .ocr-result-match{font-size:10px;padding:3px 8px;border-radius:10px;background:var(--success);color:#000;font-weight:600}
+        .ocr-result-partial{background:var(--warning)}
+        .ocr-detected-text{background:var(--bg);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px}
+        .ocr-detected-label{font-size:11px;color:var(--text-muted);margin-bottom:4px}
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="toast" id="toast"><span id="toastIcon">✓</span><span id="toastMessage"></span></div>
+        <div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
+        
+        <!-- Modals -->
+        <div class="modal-overlay" id="orderModal">
+            <div class="modal-content">
+                <div class="modal-title">📧 Bijbestellen</div>
+                <div id="orderProductInfo" style="background:var(--bg);padding:12px;border-radius:10px;font-size:13px;margin-bottom:16px"></div>
+                <div class="form-group"><label class="form-label">Aantal</label><input type="number" class="input-field" id="orderQuantity" value="1"></div>
+                <div class="form-group"><label class="form-label">Email</label><input type="email" class="input-field" id="orderEmail"></div>
+                <div class="form-group"><label class="form-label">Opmerking</label><input type="text" class="input-field" id="orderNote"></div>
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" onclick="sendOrderEmail()">📧 Verstuur</button>
+                    <button class="btn btn-secondary" onclick="closeModal('orderModal')">Annuleren</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-overlay" id="linkModal">
+            <div class="modal-content">
+                <div class="modal-title">Barcode niet gevonden</div>
+                <div style="text-align:center;margin-bottom:20px">
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--accent);margin-bottom:8px" id="linkModalBarcode"></div>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" onclick="linkToExisting()">🔗 Koppelen aan artikel</button>
+                    <button class="btn btn-success" onclick="createNewFromBarcode()">➕ Nieuw artikel</button>
+                    <button class="btn btn-secondary" onclick="closeModal('linkModal')">Annuleren</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-overlay" id="actionsModal">
+            <div class="modal-content">
+                <div class="modal-title">Meer acties</div>
+                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('edit')"><span class="more-action-icon">✏️</span>Bewerken</button>
+                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('link')"><span class="more-action-icon">🔗</span>Barcode koppelen</button>
+                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('photo')"><span class="more-action-icon">📸</span>Foto toevoegen</button>
+                <button class="more-action-btn" onclick="closeModal('actionsModal');openOrderModal()"><span class="more-action-icon">📧</span>Bijbestellen</button>
+                <div class="modal-buttons"><button class="btn btn-secondary" onclick="closeModal('actionsModal')">Sluiten</button></div>
+            </div>
+        </div>
+
+        <!-- Setup -->
+        <div class="setup-screen" id="setupScreen">
+            <div class="setup-logo">📦</div>
+            <h1 class="setup-title">DM Stock Scanner</h1>
+            <p class="setup-subtitle">Configureer de app om te beginnen</p>
+            <div class="setup-card">
+                <div class="form-group">
+                    <label class="form-label">Notion API Key</label>
+                    <input type="password" class="input-field" id="setupApiKey" placeholder="secret_...">
+                </div>
+                <button class="btn btn-primary btn-full" onclick="saveSetup()">🔗 Verbinden</button>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="mainApp" style="display:none;height:100%;flex-direction:column">
+            <header class="header">
+                <div class="header-left">
+                    <button class="back-btn" id="backBtn" onclick="goBack()">←</button>
+                    <span class="header-title" id="headerTitle">Stock Scanner</span>
+                </div>
+                <button class="header-user" id="headerUser" onclick="showScreen('more')">BAS ▼</button>
+            </header>
+
+            <main class="content">
+                <!-- HOME -->
+                <div class="screen active" id="screenHome">
+                    <div class="quick-actions">
+                        <div class="quick-action" onclick="showScreen('scan')">
+                            <div class="quick-action-icon">📷</div>
+                            <div class="quick-action-title">Scannen</div>
+                            <div class="quick-action-sub">Barcode camera</div>
+                        </div>
+                        <div class="quick-action" onclick="showScreen('articles')">
+                            <div class="quick-action-icon">📋</div>
+                            <div class="quick-action-title">Bladeren</div>
+                            <div class="quick-action-sub">Artikelen lijst</div>
+                        </div>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat-card"><div class="stat-value accent" id="statToday">0</div><div class="stat-label">Vandaag</div></div>
+                        <div class="stat-card"><div class="stat-value success" id="statTotal">0</div><div class="stat-label">Artikelen</div></div>
+                    </div>
+                    <div class="card" id="favoritesCard" style="display:none">
+                        <div class="section-title">⭐ Favorieten</div>
+                        <div id="favoritesList"></div>
+                    </div>
+                    <div class="card">
+                        <div class="section-title">🕐 Recente activiteit</div>
+                        <div id="historyList"><div class="empty-state"><div class="empty-state-icon">🕐</div><div>Nog geen activiteit</div></div></div>
+                    </div>
+                </div>
+
+                <!-- SCAN -->
+                <div class="screen" id="screenScan">
+                    <div id="scannerBox" class="scanner-box">
+                        <div id="scannerReader"></div>
+                        <div class="scanner-placeholder" id="scannerPlaceholder" onclick="startScanner()">
+                            <div class="scanner-placeholder-icon">📷</div>
+                            <div>Tik om scanner te starten</div>
+                        </div>
+                    </div>
+                    
+                    <div class="scan-status" id="scanStatus">Camera niet actief</div>
+                    
+                    <!-- Barcode Confirmation -->
+                    <div class="barcode-confirm" id="barcodeConfirm" style="display:none">
+                        <div class="barcode-confirm-label">Gescande code:</div>
+                        <div class="barcode-confirm-value" id="scannedBarcodeValue">-</div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px" id="scannedBarcodeFormat">-</div>
+                        <div class="barcode-confirm-buttons">
+                            <button class="btn btn-secondary" onclick="rejectScan()">✕ Opnieuw</button>
+                            <button class="btn btn-success" onclick="acceptScan()">✓ Bevestig</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Search Results -->
+                    <div id="ocrResults"></div>
+                    
+                    <div style="margin-top:16px">
+                        <div class="section-title">Of typ handmatig</div>
+                        <div class="input-row">
+                            <input type="text" class="input-field" id="barcodeInput" placeholder="Barcode of naam..." onkeypress="if(event.key==='Enter')lookupBarcode()">
+                            <button class="btn btn-primary" onclick="lookupBarcode()">🔍</button>
+                        </div>
+                    </div>
+                    
+                    </div>
+                </div>
+
+                <!-- ARTICLES -->
+                <div class="screen" id="screenArticles">
+                    <div id="linkBanner" style="display:none"></div>
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" id="searchInput" placeholder="Zoek artikel..." oninput="filterProducts()">
+                    </div>
+                    <div class="filter-row" id="categoryPills"></div>
+                    <div class="results-count" id="resultsCount">0 artikelen</div>
+                    <div class="product-list" id="productList"></div>
+                </div>
+
+                <!-- PRODUCT -->
+                <div class="screen" id="screenProduct">
+                    <div class="card">
+                        <div class="product-header">
+                            <div class="product-image" id="productImage">📦</div>
+                            <div style="flex:1">
+                                <div class="product-detail-name" id="productName">-</div>
+                                <div class="product-detail-category" id="productCategory">-</div>
+                                <div class="product-detail-barcode" id="productBarcode">-</div>
+                            </div>
+                            <button class="btn btn-secondary" id="productFavoriteBtn" onclick="toggleCurrentFavorite()" style="padding:10px;font-size:18px">☆</button>
+                        </div>
+                        <div class="stats-grid">
+                            <div class="stat-box"><div class="stat-box-value price" id="productPrice">-</div><div class="stat-box-label">Prijs</div></div>
+                            <div class="stat-box"><div class="stat-box-value stock" id="productStock">-</div><div class="stat-box-label">Stock</div></div>
+                            <div class="stat-box"><div class="stat-box-value" id="productUnit">-</div><div class="stat-box-label">Eenheid</div></div>
+                        </div>
+                        <select class="select-field" id="projectSelect"><option value="">-- Project kiezen --</option></select>
+                        <div class="quantity-section">
+                            <div class="quantity-control">
+                                <button class="quantity-btn" onclick="changeQuantity(-1)">−</button>
+                                <div><div class="quantity-value" id="quantityValue">1</div><div class="quantity-unit" id="quantityUnit">stuks</div></div>
+                                <button class="quantity-btn" onclick="changeQuantity(1)">+</button>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn out" onclick="registerAction('Uitscannen')"><span class="action-btn-icon">↑</span>Uitscannen</button>
+                            <button class="action-btn in" onclick="registerAction('Inleggen')"><span class="action-btn-icon">↓</span>Inleggen</button>
+                        </div>
+                        <div class="more-actions">
+                            <button class="more-action-btn" onclick="openModal('actionsModal')" style="justify-content:center;background:var(--bg)">••• Meer acties</button>
+                        </div>
+                    </div>
+                    <div class="card" id="editPanel" style="display:none">
+                        <div class="section-title">✏️ Bewerken</div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Min. stock</label><input type="number" class="input-field" id="editMinStock"></div>
+                            <div class="form-group"><label class="form-label">Ideale stock</label><input type="number" class="input-field" id="editIdealStock"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Stock correctie</label>
+                            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Huidige stock: <span id="currentStockValue">0</span></div>
+                            <div class="input-row"><input type="number" class="input-field" id="editStockValue" placeholder="Nieuwe waarde"><button class="btn btn-primary" onclick="saveStockCorrection()">💾</button></div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Verschil wordt als registratie opgeslagen</div>
+                        </div>
+                        <button class="btn btn-secondary btn-full" onclick="saveProductEdits()">Opslaan & sluiten</button>
+                    </div>
+                    <div class="card" id="linkPanel" style="display:none">
+                        <div class="section-title">🔗 Barcode Koppelen</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Huidige: <span id="currentBarcode">-</span></div>
+                        <div class="input-row">
+                            <input type="text" class="input-field" id="linkBarcodeInput" placeholder="Nieuwe barcode...">
+                            <button class="btn btn-secondary" onclick="scanForLink()">📷</button>
+                            <button class="btn btn-primary" onclick="saveLinkedBarcode()">💾</button>
+                        </div>
+                    </div>
+                    <div class="card" id="photoPanel" style="display:none">
+                        <div class="section-title">📸 Product Foto</div>
+                        <div style="aspect-ratio:1;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:12px;border:2px dashed var(--border)" id="photoCaptureBox" onclick="startPhotoCapture()">
+                            <video id="photoVideo" style="display:none;width:100%;height:100%;object-fit:cover" autoplay playsinline></video>
+                            <img id="photoPreview" style="display:none;width:100%;height:100%;object-fit:cover">
+                            <div id="photoPlaceholder" style="text-align:center;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:8px">📸</div><div>Tik om foto te maken</div></div>
+                        </div>
+                        <div class="input-row" id="photoActions" style="display:none">
+                            <button class="btn btn-secondary" onclick="retakePhoto()" style="flex:1">🔄 Opnieuw</button>
+                            <button class="btn btn-primary" onclick="savePhoto()" style="flex:1">💾 Opslaan</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOG -->
+                <div class="screen" id="screenLog">
+                    <div class="section-title">📊 Project Overzicht</div>
+                    <div id="logList"><div class="empty-state"><div class="empty-state-icon">📊</div><div>Nog geen registraties</div></div></div>
+                    <button class="btn btn-secondary btn-full" onclick="clearScanLog()" style="margin-top:16px;opacity:0.6">🗑️ Log wissen</button>
+                </div>
+
+                <!-- MORE -->
+                <div class="screen" id="screenMore">
+                    <div class="card">
+                        <div class="section-title">👤 Gebruiker</div>
+                        <select class="select-field" id="userSelect" onchange="changeUser(this.value)" style="margin-bottom:12px"></select>
+                        <div class="input-row"><input type="text" class="input-field" id="newUserInput" placeholder="Nieuwe gebruiker..."><button class="btn btn-primary" onclick="addUser()">+</button></div>
+                    </div>
+                    <div class="card">
+                        <div class="section-title">➕ Nieuw Artikel</div>
+                        <button class="btn btn-success btn-full" onclick="showScreen('newArticle')">Nieuw artikel aanmaken</button>
+                    </div>
+                    <div class="card">
+                        <div class="section-title">🏷️ QR Labels</div>
+                        <button class="btn btn-secondary btn-full" onclick="showScreen('qrlabels')" style="margin-bottom:10px">QR labels genereren</button>
+                    </div>
+                    <div class="card">
+                        <div class="section-title">🔧 Instellingen</div>
+                        <div class="form-group"><label class="form-label">Notion API Key</label><input type="password" class="input-field" id="settingsApiKey"></div>
+                        <button class="btn btn-secondary btn-full" onclick="saveApiKey()" style="margin-bottom:10px">🔗 Test & Opslaan</button>
+                        <button class="btn btn-secondary btn-full" onclick="reloadData()" style="margin-bottom:10px">🔄 Data herladen</button>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border);margin-top:10px">
+                            <span style="font-size:14px">🐛 Debug modus</span>
+                            <label style="position:relative;width:50px;height:26px">
+                                <input type="checkbox" id="debugToggle" onchange="toggleDebug()" style="opacity:0;width:0;height:0">
+                                <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--bg);border:1px solid var(--border);border-radius:26px;transition:.3s"></span>
+                                <span id="debugToggleKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--text-muted);border-radius:50%;transition:.3s"></span>
+                            </label>
+                        </div>
+                        <button class="btn btn-secondary btn-full" onclick="clearAllData()" style="opacity:0.6;margin-top:10px">🗑️ Alle data wissen</button>
+                    </div>
+                </div>
+
+                <!-- QR LABELS -->
+                <div class="screen" id="screenQrlabels">
+                    <div class="card">
+                        <div class="section-title">🏷️ QR Labels Genereren</div>
+                        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Selecteer artikelen om QR labels te genereren. Print deze pagina om labels te maken.</p>
+                        
+                        <div class="search-container">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" class="search-input" id="qrSearchInput" placeholder="Zoek artikel..." oninput="filterQRProducts()">
+                        </div>
+                        
+                        <!-- Filter: alleen zonder QR code -->
+                        <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;cursor:pointer">
+                            <input type="checkbox" id="qrFilterNoCode" onchange="filterQRProducts()" style="width:18px;height:18px">
+                            Alleen artikelen zonder QR code tonen
+                        </label>
+                        
+                        <div style="display:flex;gap:8px;margin-bottom:12px">
+                            <button class="btn btn-secondary" onclick="selectAllQR()" style="flex:1;padding:10px;font-size:12px">Alles selecteren</button>
+                            <button class="btn btn-secondary" onclick="deselectAllQR()" style="flex:1;padding:10px;font-size:12px">Niets selecteren</button>
+                        </div>
+                        
+                        <div id="qrProductList" style="max-height:250px;overflow-y:auto;background:var(--bg);border-radius:10px;padding:8px"></div>
+                        
+                        <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:10px;text-align:center">
+                            <span style="font-size:14px" id="qrSelectedCount">0 artikelen geselecteerd</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="section-title">🏷️ Label Formaat</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                            <label class="label-format-option" style="display:flex;flex-direction:column;align-items:center;padding:12px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)">
+                                <input type="radio" name="labelFormat" value="square" checked style="display:none">
+                                <span style="font-size:20px;margin-bottom:4px">⬜</span>
+                                <span style="font-size:11px;font-weight:600">Vierkant</span>
+                                <span style="font-size:9px;color:var(--text-muted)">25x25mm</span>
+                            </label>
+                            <label class="label-format-option" style="display:flex;flex-direction:column;align-items:center;padding:12px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)">
+                                <input type="radio" name="labelFormat" value="small" style="display:none">
+                                <span style="font-size:20px;margin-bottom:4px">▬</span>
+                                <span style="font-size:11px;font-weight:600">Klein</span>
+                                <span style="font-size:9px;color:var(--text-muted)">32x25mm</span>
+                            </label>
+                            <label class="label-format-option" style="display:flex;flex-direction:column;align-items:center;padding:12px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)">
+                                <input type="radio" name="labelFormat" value="medium" style="display:none">
+                                <span style="font-size:20px;margin-bottom:4px">▭</span>
+                                <span style="font-size:11px;font-weight:600">Medium</span>
+                                <span style="font-size:9px;color:var(--text-muted)">51x25mm</span>
+                            </label>
+                        </div>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">💡 Zebra ZD421 compatibel. Stel je printer in op het juiste labelformaat.</p>
+                        <div style="margin-top:12px">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                                <input type="checkbox" id="qrSaveToNotion" checked style="width:18px;height:18px">
+                                QR codes opslaan in Notion
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary btn-full" onclick="generateQRLabels()">🖨️ Labels Genereren & Printen</button>
+                </div>
+
+                <!-- NEW ARTICLE -->
+                <div class="screen" id="screenNewArticle">
+                    <div class="card">
+                        <div class="section-title">📷 Barcode</div>
+                        <div style="background:var(--bg);border-radius:10px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:18px;text-align:center;margin-bottom:12px" id="newArticleBarcode">-</div>
+                        <div class="input-row" style="margin-bottom:8px">
+                            <button class="btn btn-secondary" onclick="scanForNewArticle()" style="flex:1">📷 Scan</button>
+                            <button class="btn btn-secondary" onclick="generateBarcode()" style="flex:1">🔢 Genereer</button>
+                        </div>
+                        <input type="text" class="input-field" id="newBarcodeInput" placeholder="Of typ handmatig..." oninput="updateNewBarcode(this.value)">
+                    </div>
+                    <div class="card">
+                        <div class="section-title">📝 Gegevens</div>
+                        <div class="form-group"><label class="form-label">Omschrijving *</label><input type="text" class="input-field" id="newName" placeholder="Bijv. Schroef 4x40"></div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Hoofdgroep *</label><select class="select-field" id="newCategory"><option value="">Kies...</option><option value="BEVESTIGING">Bevestiging</option><option value="BESLAG">Beslag</option><option value="LIJM / KIT">Lijm / Kit</option><option value="PLAATMATERIAAL">Plaatmateriaal</option><option value="SCHUREN">Schuren</option><option value="ELECTRA">Electra</option><option value="VERFKOT">Verfkot</option></select></div>
+                            <div class="form-group"><label class="form-label">Eenheid *</label><select class="select-field" id="newUnit"><option value="">Kies...</option><option value="stuk">stuk</option><option value="doos">doos</option><option value="pak">pak</option><option value="meter">meter</option><option value="rol">rol</option><option value="plaat">plaat</option></select></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Prijs (€)</label><input type="number" step="0.01" class="input-field" id="newPrice" placeholder="0.00"></div>
+                            <div class="form-group"><label class="form-label">Begin stock</label><input type="number" class="input-field" id="newStock" placeholder="0"></div>
+                        </div>
+                        <div class="form-group"><label class="form-label">Leverancier</label><select class="select-field" id="newSupplier"><option value="">Kies...</option><option value="NV Berner Belgien">Berner</option><option value="LMC">LMC</option><option value="LECOT">Lecot</option><option value="Festool">Festool</option><option value="Häfele">Häfele</option></select></div>
+                    </div>
+                    <button class="btn btn-success btn-full" onclick="saveNewArticle()">✓ Artikel Opslaan</button>
+                </div>
+            </main>
+
+            <!-- Fixed Debug Console - Collapsible -->
+            <div id="debugConsole" style="display:none;position:fixed;bottom:70px;left:0;right:0;z-index:90;transition:transform 0.3s">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 16px;background:var(--card);border-top:2px solid var(--accent);cursor:pointer" onclick="toggleDebugPanel()">
+                    <span style="font-size:12px;font-weight:600">🐛 Debug Log <span id="debugToggleArrow">▼</span></span>
+                    <button onclick="event.stopPropagation();clearDebugLog()" style="padding:4px 8px;font-size:10px;background:var(--border);border:none;border-radius:4px;color:var(--text)">Clear</button>
+                </div>
+                <div id="debugLogWrapper" style="max-height:150px;overflow:hidden;transition:max-height 0.3s;background:var(--card)">
+                    <div id="debugLog" style="padding:8px 16px;max-height:150px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.5"></div>
+                </div>
+            </div>
+
+            <nav class="bottom-nav">
+                <button class="nav-item active" id="navHome" onclick="showScreen('home')"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
+                <button class="nav-item" id="navScan" onclick="showScreen('scan')"><span class="nav-icon">📷</span><span class="nav-label">Scan</span></button>
+                <button class="nav-item" id="navArticles" onclick="showScreen('articles')"><span class="nav-icon">📋</span><span class="nav-label">Artikelen</span></button>
+                <button class="nav-item" id="navLog" onclick="showScreen('log');renderLog()"><span class="nav-icon">📊</span><span class="nav-label">Log</span></button>
+                <button class="nav-item" id="navMore" onclick="showScreen('more')"><span class="nav-icon">⚙️</span><span class="nav-label">Meer</span></button>
+            </nav>
+        </div>
+    </div>
+<script>
+// === CONFIG ===
+const STOCK_DB='ae9ddd17fe69439991851affe25714ce';
+const PROJECTS_DB='aa8ba0ce47bb4399bfdf0e6852b0d568';
+const REGISTRATIONS_DB='2412e803e23648a9a55df3b38975a84d';
+
+// === STATE ===
+let apiKey=localStorage.getItem('notion_api_key')||'';
+let users=JSON.parse(localStorage.getItem('users')||'["BAS"]');
+let userName=localStorage.getItem('user_name')||'BAS';
+let products=[],filteredProducts=[],projects=[],activeProjects=[],archivedProjects=[];
+let favorites=JSON.parse(localStorage.getItem('favorites')||'[]');
+let history=JSON.parse(localStorage.getItem('scan_history')||'[]');
+let scanLog=JSON.parse(localStorage.getItem('scan_log')||'[]');
+let marginOverrides=JSON.parse(localStorage.getItem('margin_overrides')||'{}');
+let currentProduct=null,quantity=1,currentScreen='home',screenHistory=['home'];
+let photoStream=null,capturedPhoto=null;
+let lastProjectId=localStorage.getItem('last_project_id')||'';
+let lastProjectTime=parseInt(localStorage.getItem('last_project_time')||'0');
+let linkingMode=false,linkingBarcode='',newArticleBarcode='';
+const PROJECT_TIMEOUT=10*60*1000;
+const categories=[{id:'all',name:'Alles',icon:'📦'},{id:'BEVESTIGING',name:'Bevestiging',icon:'🔩'},{id:'BESLAG',name:'Beslag',icon:'🔧'},{id:'LIJM / KIT',name:'Lijm/Kit',icon:'🧴'},{id:'PLAATMATERIAAL',name:'Plaatmat.',icon:'🪵'},{id:'SCHUREN',name:'Schuren',icon:'📄'},{id:'ELECTRA',name:'Electra',icon:'⚡'},{id:'VERFKOT',name:'Verfkot',icon:'🎨'}];
+let activeCategory='all';
+
+// === INIT ===
+document.addEventListener('DOMContentLoaded',()=>{if(!users.includes('BAS'))users.unshift('BAS');apiKey?startApp():document.getElementById('setupScreen').style.display='flex';});
+
+function saveSetup(){const key=document.getElementById('setupApiKey').value.trim();if(!key||(!key.startsWith('secret_')&&!key.startsWith('ntn_'))){showToast('Ongeldige API key','error');return;}testApiKey(key,true);}
+
+async function testApiKey(key,isSetup){
+    showLoading(true);
+    debugLog('API key testen...',{keyPrefix:key.substring(0,10)+'...',isSetup});
+    try{
+        const url=`https://corsproxy.io/?${encodeURIComponent('https://api.notion.com/v1/databases/'+STOCK_DB)}`;
+        debugLog('Test URL',url);
+        const res=await fetch(url,{headers:{'Authorization':`Bearer ${key}`,'Notion-Version':'2022-06-28'}});
+        debugLog('Test response',{status:res.status,ok:res.ok});
+        if(!res.ok){
+            const errorText=await res.text();
+            debugLog('Test error',errorText);
+            throw new Error('Ongeldige key: '+res.status);
+        }
+        localStorage.setItem('notion_api_key',key);apiKey=key;
+        debugLog('API key opgeslagen');
+        if(isSetup){document.getElementById('setupScreen').style.display='none';showToast('Verbonden!');startApp();}else{showToast('API key opgeslagen');}
+    }catch(e){
+        debugLog('Verbinding mislukt',e.message);
+        showToast('Verbinding mislukt: '+e.message,'error');
+    }
+    showLoading(false);
+}
+
+async function startApp(){
+    document.getElementById('mainApp').style.display='flex';
+    document.getElementById('setupScreen').style.display='none';
+    document.getElementById('headerUser').textContent=userName+' ▼';
+    document.getElementById('settingsApiKey').value=apiKey;
+    renderUserSelect();renderCategoryPills();renderHistory();renderFavorites();updateStats();
+    
+    // Load data but don't block the app if it fails
+    try{
+        await Promise.all([loadProducts(),loadProjects()]);
+    }catch(e){
+        debugLog('Data laden mislukt',e.message);
+        console.error('Data load error:',e);
+    }
+}
+
+// === API ===
+async function notionRequest(endpoint,method='GET',body=null){
+    const url=`https://api.notion.com/v1${endpoint}`;
+    const opts={method,headers:{'Authorization':`Bearer ${apiKey}`,'Notion-Version':'2022-06-28','Content-Type':'application/json'}};
+    if(body)opts.body=JSON.stringify(body);
+    
+    debugLog(`API ${method} ${endpoint}`);
+    
+    const res=await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`,opts);
+    
+    if(!res.ok){
+        const errorText=await res.text();
+        let errorDetail='';
+        try{
+            const errorJson=JSON.parse(errorText);
+            errorDetail=errorJson.message||errorJson.code||errorText;
+            debugLog('API ERROR',{status:res.status,error:errorJson});
+        }catch(e){
+            errorDetail=errorText;
+            debugLog('API ERROR',{status:res.status,error:errorText});
+        }
+        throw new Error(`API ${res.status}: ${errorDetail}`);
+    }
+    
+    const data=await res.json();
+    debugLog(`API response OK`,{hasResults:!!data.results,id:data.id});
+    return data;
+}
+
+// === DATA ===
+async function loadProducts(){
+    showLoading(true);
+    debugLog('Products laden van Notion...');
+    try{
+        let all=[],hasMore=true,cursor,pageNum=0;
+        while(hasMore){
+            pageNum++;
+            const body={filter:{property:'TYPE ITEM',select:{equals:'STOCK'}},page_size:100};
+            if(cursor)body.start_cursor=cursor;
+            debugLog(`Notion query pagina ${pageNum}`,{cursor:cursor||'start'});
+            const res=await notionRequest(`/databases/${STOCK_DB}/query`,'POST',body);
+            const items=res.results.map(p=>({id:p.id,name:p.properties['OMSCHRIJVIN']?.title?.[0]?.plain_text||'',barcode:p.properties[' ID (barcode)']?.rich_text?.[0]?.plain_text||'',category:p.properties['HOOFDGROEP']?.select?.name||'',price:p.properties['AANKOOP PRIJS ']?.number||0,margin:p.properties['MARGE / VERWERKINGSTOESLAG']?.number||0.2,stock:p.properties['stock totaal']?.formula?.number??p.properties['STOCK (begin 2023) manual overrule']?.number??0,unit:p.properties['EENHEID']?.select?.name||'',minStock:p.properties['MINIMUM STOCK']?.number||0,idealStock:p.properties['IDEALE STOCK']?.number||0,supplier:p.properties['Leverancier']?.select?.name||'',imageUrl:p.properties['Afbeelding']?.files?.[0]?.external?.url||p.properties['Afbeelding']?.files?.[0]?.file?.url||''}));
+            debugLog(`Pagina ${pageNum} resultaat`,{items:items.length,hasMore:res.has_more});
+            all=[...all,...items];hasMore=res.has_more;cursor=res.next_cursor;
+        }
+        products=all.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+        debugLog('Products geladen',{
+            totaal:products.length,
+            metBarcode:products.filter(p=>p.barcode).length,
+            zonderBarcode:products.filter(p=>!p.barcode).length
+        });
+        // Log first 5 barcodes for debugging
+        debugLog('Eerste 5 barcodes',products.slice(0,5).map(p=>({name:p.name.substring(0,30),barcode:p.barcode})));
+        filterProducts();updateStats();showToast(`${products.length} artikelen`);
+    }catch(e){
+        debugLog('Laden mislukt',e.message);
+        showToast('Laden mislukt','error');
+    }
+    showLoading(false);
+}
+
+async function loadProjects(){
+    try{
+        const [resA,resB]=await Promise.all([
+            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{filter:{and:[{property:'FASE PROJECT',status:{does_not_equal:'Gearchiveerd'}},{property:'Archiveren',checkbox:{equals:false}}]},sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],page_size:100}),
+            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{filter:{or:[{property:'FASE PROJECT',status:{equals:'Gearchiveerd'}},{property:'Archiveren',checkbox:{equals:true}}]},sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],page_size:50})
+        ]);
+        const map=p=>({id:p.id,name:p.properties['Project name  (KLANT_PROJECTNAAM)']?.title?.[0]?.plain_text||'',number:p.properties['PROJECT NUMBER  (new)']?.unique_id?.number||0});
+        activeProjects=resA.results.map(map).filter(p=>p.name);
+        archivedProjects=resB.results.map(map).filter(p=>p.name);
+        projects=[...activeProjects,...archivedProjects];
+        renderProjectSelect();
+    }catch(e){console.error(e);}
+}
+
+// === NAVIGATION ===
+function showScreen(screen){
+    if(currentScreen==='scan')stopScanner();
+    if(currentScreen==='product')hideAllPanels();
+    if(!['product','newArticle','qrlabels'].includes(screen))screenHistory=[screen];
+    else screenHistory.push(screen);
+    currentScreen=screen;
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById('screen'+screen.charAt(0).toUpperCase()+screen.slice(1))?.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    const navMap={home:'navHome',scan:'navScan',articles:'navArticles',log:'navLog',more:'navMore',qrlabels:'navMore'};
+    document.getElementById(navMap[screen])?.classList.add('active');
+    const titles={home:'Stock Scanner',scan:'Scannen',articles:'Artikelen',product:'Artikel',log:'Scan Log',more:'Instellingen',newArticle:'Nieuw Artikel',qrlabels:'QR Labels'};
+    document.getElementById('headerTitle').textContent=titles[screen]||'Stock Scanner';
+    document.getElementById('backBtn').classList.toggle('visible',['product','newArticle','qrlabels'].includes(screen));
+}
+
+function goBack(){screenHistory.pop();showScreen(screenHistory[screenHistory.length-1]||'home');}
+
+// === BARCODE SCANNER (ZXing-js) ===
+let pendingCode='';
+let pendingFormat='';
+let debugMode=false;
+let recentScans=[];
+const STABILITY_COUNT=2; // Need 2 identical scans
+const STABILITY_WINDOW=1500; // Within 1.5 seconds
+
+function debugLog(msg,data=null){
+    if(!debugMode)return;
+    const time=new Date().toLocaleTimeString('nl-BE');
+    const logDiv=document.getElementById('debugLog');
+    let entry=`<div style="border-bottom:1px solid var(--border);padding:4px 0"><span style="color:var(--accent)">[${time}]</span> ${msg}`;
+    if(data!==null){
+        entry+=`<div style="color:var(--text-muted);margin-left:12px">${typeof data==='object'?JSON.stringify(data,null,1):data}</div>`;
+    }
+    entry+='</div>';
+    logDiv.innerHTML=entry+logDiv.innerHTML;
+    // Keep max 50 entries
+    const entries=logDiv.querySelectorAll(':scope > div');
+    if(entries.length>50)entries[entries.length-1].remove();
+    console.log(`[DEBUG] ${msg}`,data);
+}
+
+function clearDebugLog(){
+    document.getElementById('debugLog').innerHTML='<div style="color:var(--text-muted)">Log gewist</div>';
+}
+
+let debugPanelOpen=true;
+function toggleDebugPanel(){
+    debugPanelOpen=!debugPanelOpen;
+    document.getElementById('debugLogWrapper').style.maxHeight=debugPanelOpen?'150px':'0px';
+    document.getElementById('debugToggleArrow').textContent=debugPanelOpen?'▼':'▲';
+}
+
+function toggleDebug(){
+    debugMode=document.getElementById('debugToggle').checked;
+    document.getElementById('debugConsole').style.display=debugMode?'block':'none';
+    const knob=document.getElementById('debugToggleKnob');
+    knob.style.left=debugMode?'27px':'3px';
+    knob.style.background=debugMode?'var(--success)':'var(--text-muted)';
+    localStorage.setItem('debug_mode',debugMode?'1':'0');
+    if(debugMode)debugLog('Debug modus ingeschakeld');
+}
+
+// ZXing Scanner
+let codeReader=null;
+let scannerControls=null;
+
+async function startScanner(){
+    if(scannerControls){
+        debugLog('Scanner al actief, stoppen eerst');
+        await stopScanner();
+    }
+    
+    document.getElementById('scannerPlaceholder').style.display='none';
+    document.getElementById('scanStatus').textContent='Camera starten...';
+    document.getElementById('barcodeConfirm').style.display='none';
+    recentScans=[];
+    
+    debugLog('ZXing scanner starten...');
+    
+    try{
+        // Create multi-format reader with hints for better recognition
+        const hints=new Map();
+        hints.set(2,true); // TRY_HARDER
+        hints.set(3,true); // PURE_BARCODE (assume barcode only, no text around it)
+        
+        codeReader=new ZXingBrowser.BrowserMultiFormatReader(hints);
+        
+        // Get available cameras
+        const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+        debugLog('Beschikbare cameras',devices.map(d=>({id:d.deviceId,label:d.label})));
+        
+        if(!devices||devices.length===0){
+            throw new Error('Geen camera gevonden');
+        }
+        
+        // Prefer back camera
+        let selectedDeviceId=devices[0].deviceId;
+        const backCamera=devices.find(d=>
+            d.label.toLowerCase().includes('back')||
+            d.label.toLowerCase().includes('rear')||
+            d.label.toLowerCase().includes('environment')||
+            d.label.toLowerCase().includes('achter')
+        );
+        if(backCamera){
+            selectedDeviceId=backCamera.deviceId;
+            debugLog('Achtercamera geselecteerd',backCamera.label);
+        }else{
+            debugLog('Eerste camera gebruiken',devices[0].label);
+        }
+        
+        // Create video element with better constraints
+        let videoElem=document.getElementById('scannerVideo');
+        if(!videoElem){
+            videoElem=document.createElement('video');
+            videoElem.id='scannerVideo';
+            videoElem.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:16px';
+            videoElem.setAttribute('playsinline','true');
+            videoElem.setAttribute('autoplay','true');
+            document.getElementById('scannerReader').appendChild(videoElem);
+        }
+        
+        debugLog('Scanner starten met device',selectedDeviceId);
+        
+        // Video constraints for better quality
+        const constraints={
+            video:{
+                deviceId:selectedDeviceId?{exact:selectedDeviceId}:undefined,
+                facingMode:'environment',
+                width:{ideal:1280},
+                height:{ideal:720},
+                focusMode:'continuous'
+            }
+        };
+        
+        // Start continuous scanning
+        scannerControls=await codeReader.decodeFromConstraints(
+            constraints,
+            videoElem,
+            (result,error,controls)=>{
+                if(result){
+                    onZXingScanSuccess(result);
+                }
+                // Errors are normal when no code found, ignore them
+            }
+        );
+        
+        document.getElementById('scannerBox').classList.add('active');
+        document.getElementById('scanStatus').textContent='Zoeken naar code...';
+        document.getElementById('scanStatus').className='scan-status detecting';
+        debugLog('ZXing scanner actief');
+        
+    }catch(e){
+        console.error('Scanner error:',e);
+        debugLog('Scanner error',e.message);
+        showToast('Camera niet beschikbaar: '+e.message,'error');
+        document.getElementById('scannerPlaceholder').style.display='flex';
+        document.getElementById('scanStatus').textContent='Camera fout: '+e.message;
+    }
+}
+
+function onZXingScanSuccess(result){
+    const decodedText=result.getText();
+    const format=result.getBarcodeFormat();
+    const now=Date.now();
+    
+    debugLog('Scan gedetecteerd',{code:decodedText,format:format});
+    
+    // Add to recent scans
+    recentScans.push({code:decodedText,format:format,time:now});
+    
+    // Remove old scans outside window
+    recentScans=recentScans.filter(s=>now-s.time<STABILITY_WINDOW);
+    
+    // Check for stability (same code scanned multiple times)
+    const matchingScans=recentScans.filter(s=>s.code===decodedText);
+    
+    debugLog('Stabiliteit check',{
+        recentScans:recentScans.length,
+        matchingScans:matchingScans.length,
+        required:STABILITY_COUNT
+    });
+    
+    if(matchingScans.length>=STABILITY_COUNT){
+        // Stable scan! Stop scanning and show confirmation
+        debugLog('Stabiele code gevonden!',{code:decodedText,format:format});
+        
+        if(navigator.vibrate)navigator.vibrate([100,50,100]);
+        
+        pendingCode=decodedText;
+        pendingFormat=format.toString();
+        recentScans=[];
+        
+        // Pause scanner
+        if(scannerControls){
+            scannerControls.stop();
+            debugLog('Scanner gestopt voor bevestiging');
+        }
+        
+        document.getElementById('scannedBarcodeValue').textContent=decodedText;
+        document.getElementById('scannedBarcodeFormat').textContent='Type: '+format.toString();
+        document.getElementById('barcodeConfirm').style.display='block';
+        document.getElementById('scanStatus').textContent='Code gevonden!';
+        document.getElementById('scanStatus').className='scan-status found';
+    }
+}
+
+async function stopScanner(){
+    debugLog('Scanner stoppen...');
+    if(scannerControls){
+        try{
+            scannerControls.stop();
+        }catch(e){
+            debugLog('Stop error (negeren)',e.message);
+        }
+        scannerControls=null;
+    }
+    codeReader=null;
+    document.getElementById('scannerReader').innerHTML='';
+    document.getElementById('scannerBox').classList.remove('active');
+    document.getElementById('scannerPlaceholder').style.display='flex';
+    document.getElementById('scanStatus').textContent='Camera niet actief';
+    document.getElementById('scanStatus').className='scan-status';
+    document.getElementById('barcodeConfirm').style.display='none';
+    document.getElementById('ocrResults').innerHTML='';
+    pendingCode='';
+    pendingFormat='';
+    recentScans=[];
+}
+
+async function rejectScan(){
+    debugLog('Scan verworpen, opnieuw starten');
+    pendingCode='';
+    pendingFormat='';
+    recentScans=[];
+    document.getElementById('barcodeConfirm').style.display='none';
+    document.getElementById('scanStatus').textContent='Zoeken naar code...';
+    document.getElementById('scanStatus').className='scan-status detecting';
+    
+    // Restart ZXing scanner
+    await startScanner();
+}
+
+async function acceptScan(){
+    const code=pendingCode;
+    debugLog('Scan geaccepteerd',{code:code,format:pendingFormat});
+    await stopScanner();
+    document.getElementById('barcodeInput').value=code;
+    lookupBarcode();
+}
+
+function lookupBarcode(){
+    var input=document.getElementById('barcodeInput').value.trim();
+    if(!input){showToast('Voer code in','error');return;}
+    
+    debugLog('Zoeken naar product',{input:input});
+    
+    var norm=function(b){return(b||'').trim().toUpperCase();};
+    var search=norm(input);
+    var found=products.find(function(p){return norm(p.barcode)===search;});
+    
+    debugLog('Exacte barcode match',{found:found?found.name:'geen'});
+    
+    if(!found){
+        var ws='/'+search.replace(/^\//,''),wos=search.replace(/^\//,'');
+        found=products.find(function(p){var pb=norm(p.barcode);return pb===ws||pb===wos||pb.includes(search);});
+        debugLog('Gedeeltelijke barcode match',{found:found?found.name:'geen'});
+    }
+    
+    if(!found){
+        var searchLower=input.toLowerCase();
+        found=products.find(function(p){return p.name&&p.name.toLowerCase()===searchLower;});
+        debugLog('Exacte naam match',{found:found?found.name:'geen'});
+        
+        if(!found){
+            var matches=products.filter(function(p){return p.name&&p.name.toLowerCase().includes(searchLower);});
+            debugLog('Gedeeltelijke naam matches',{count:matches.length});
+            
+            if(matches.length===1)found=matches[0];
+            else if(matches.length>1){
+                var resultsDiv=document.getElementById('ocrResults');
+                var html='<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Meerdere resultaten:</div><div class="ocr-results">';
+                matches.slice(0,5).forEach(function(m){
+                    html+='<div class="ocr-result-item" onclick="selectProduct(products.find(function(p){return p.id===\''+m.id+'\';}))"><div style="flex:1"><div style="font-size:14px;font-weight:500">'+esc(m.name)+'</div></div></div>';
+                });
+                resultsDiv.innerHTML=html+'</div>';
+                return;
+            }
+        }
+    }
+    
+    if(found){
+        debugLog('Product gevonden',{id:found.id,name:found.name,barcode:found.barcode});
+        document.getElementById('barcodeInput').value='';
+        document.getElementById('ocrResults').innerHTML='';
+        selectProduct(found);
+    }else{
+        debugLog('Geen product gevonden, toon link modal');
+        linkingBarcode=input;
+        document.getElementById('linkModalBarcode').textContent=input;
+        openModal('linkModal');
+    }
+}
+
+// === PRODUCTS ===
+function filterProducts(){
+    let f=[...products];
+    if(activeCategory!=='all')f=f.filter(p=>p.category===activeCategory);
+    const q=(document.getElementById('searchInput')?.value||'').toLowerCase();
+    if(q)f=f.filter(p=>p.name?.toLowerCase().includes(q)||p.barcode?.toLowerCase().includes(q));
+    f.sort((a,b)=>{const af=favorites.includes(a.id),bf=favorites.includes(b.id);if(af&&!bf)return -1;if(!af&&bf)return 1;return(a.name||'').localeCompare(b.name||'');});
+    filteredProducts=f;renderProductList();
+}
+
+function renderProductList(){
+    const list=document.getElementById('productList');
+    document.getElementById('resultsCount').textContent=`${filteredProducts.length} artikelen`;
+    if(!filteredProducts.length){list.innerHTML='<div class="empty-state"><div class="empty-state-icon">🔍</div><div>Geen artikelen</div></div>';return;}
+    list.innerHTML=filteredProducts.map(p=>`<div class="product-item" onclick="selectProduct(products.find(x=>x.id==='${p.id}'))"><div class="product-icon">${p.imageUrl?`<img src="${p.imageUrl}" onerror="this.parentElement.textContent='${getCategoryIcon(p.category)}'">`:getCategoryIcon(p.category)}</div><div class="product-info"><div class="product-name">${esc(p.name)}</div><div class="product-meta"><span>${p.unit||'-'}</span><span>•</span><span>€${(p.price||0).toFixed(2)}</span></div></div><div class="product-stock ${(p.stock||0)<=(p.minStock||1)?'low':'ok'}">${p.stock||0}</div></div>`).join('');
+}
+
+function selectProduct(p){
+    if(!p)return;
+    if(linkingMode&&linkingBarcode){confirmLink(p);return;}
+    currentProduct=p;quantity=1;
+    const img=document.getElementById('productImage');
+    img.innerHTML=p.imageUrl?`<img src="${p.imageUrl}" onerror="this.textContent='${getCategoryIcon(p.category)}'">`:`<span>${getCategoryIcon(p.category)}</span>`;
+    document.getElementById('productName').textContent=p.name||'-';
+    document.getElementById('productCategory').textContent=p.category||'-';
+    document.getElementById('productBarcode').textContent=p.barcode||'Geen barcode';
+    document.getElementById('productPrice').textContent=`€${(p.price||0).toFixed(2)}`;
+    const st=document.getElementById('productStock');st.textContent=p.stock||0;st.className='stat-box-value stock'+((p.stock||0)<=(p.minStock||1)?' low':'');
+    document.getElementById('productUnit').textContent=p.unit||'-';
+    document.getElementById('quantityUnit').textContent=p.unit||'stuks';
+    document.getElementById('quantityValue').textContent=1;
+    document.getElementById('productFavoriteBtn').textContent=favorites.includes(p.id)?'⭐':'☆';
+    document.getElementById('editMinStock').value=p.minStock||'';
+    document.getElementById('editIdealStock').value=p.idealStock||'';
+    document.getElementById('currentBarcode').textContent=p.barcode||'Geen';
+    const sel=document.getElementById('projectSelect');
+    if(lastProjectId&&(Date.now()-lastProjectTime)<PROJECT_TIMEOUT)sel.value=lastProjectId;else sel.value='';
+    hideAllPanels();showScreen('product');
+}
+
+async function confirmLink(product){
+    if(!confirm(`Barcode "${linkingBarcode}" koppelen aan:\n\n${product.name}?`))return;
+    showLoading(true);
+    try{
+        await notionRequest(`/pages/${product.id}`,'PATCH',{properties:{' ID (barcode)':{rich_text:[{text:{content:linkingBarcode}}]}}});
+        product.barcode=linkingBarcode;const idx=products.findIndex(x=>x.id===product.id);if(idx>=0)products[idx].barcode=linkingBarcode;
+        showToast('Barcode gekoppeld!');linkingMode=false;linkingBarcode='';renderLinkBanner();selectProduct(product);
+    }catch(e){showToast('Koppelen mislukt','error');}
+    showLoading(false);
+}
+
+function changeQuantity(d){quantity=Math.max(1,quantity+d);document.getElementById('quantityValue').textContent=quantity;}
+
+async function registerAction(action){
+    const projectId=document.getElementById('projectSelect').value;
+    if(!projectId){showToast('Selecteer project','error');return;}
+    if(!currentProduct)return;
+    showLoading(true);
+    
+    debugLog('Registratie starten',{action,projectId,productId:currentProduct.id,productName:currentProduct.name});
+    
+    try{
+        const qty=action==='Uitscannen'?-quantity:quantity;
+        const proj=projects.find(p=>p.id===projectId);
+        
+        const payload={
+            parent:{database_id:REGISTRATIONS_DB},
+            properties:{
+                'Omschrijving':{title:[{text:{content:`${currentProduct.name} - ${action}`}}]},
+                'Actie':{select:{name:action}},
+                'Aantal':{number:qty},
+                'Medewerker':{rich_text:[{text:{content:userName}}]},
+                'Eenheidsprijs':{number:currentProduct.price||0},
+                'Datum':{date:{start:new Date().toISOString().split('T')[0]}},
+                'Barcode':{rich_text:[{text:{content:currentProduct.barcode||''}}]},
+                'Stock Artikel':{relation:[{id:currentProduct.id}]},
+                'Project':{relation:[{id:projectId}]}
+            }
+        };
+        
+        debugLog('Notion payload',payload);
+        
+        const result=await notionRequest('/pages','POST',payload);
+        
+        debugLog('Registratie succesvol',{pageId:result?.id});
+        
+        currentProduct.stock=(currentProduct.stock||0)+qty;
+        const idx=products.findIndex(x=>x.id===currentProduct.id);
+        if(idx>=0)products[idx].stock=currentProduct.stock;
+        document.getElementById('productStock').textContent=currentProduct.stock;
+        lastProjectId=projectId;lastProjectTime=Date.now();
+        localStorage.setItem('last_project_id',projectId);
+        localStorage.setItem('last_project_time',lastProjectTime.toString());
+        addToHistory({name:currentProduct.name,action,amount:qty,project:proj?.name||''});
+        addToScanLog({productId:currentProduct.id,productName:currentProduct.name,projectId,projectName:proj?.name||'',projectNumber:proj?.number||0,action,quantity:qty,price:currentProduct.price||0,margin:currentProduct.margin||0.2});
+        quantity=1;document.getElementById('quantityValue').textContent=1;
+        showToast(`${Math.abs(qty)}x ${action==='Uitscannen'?'uit':'in'}`);
+    }catch(e){
+        console.error('Registratie fout:',e);
+        debugLog('Registratie FOUT',{error:e.message,stack:e.stack});
+        showToast('Fout: '+e.message,'error');
+    }
+    showLoading(false);
+}
+
+// === PANELS ===
+function hideAllPanels(){['editPanel','linkPanel','photoPanel'].forEach(id=>document.getElementById(id).style.display='none');stopPhotoStream();}
+function showPanel(p){
+    hideAllPanels();
+    if(p==='edit'&&currentProduct){
+        document.getElementById('currentStockValue').textContent=currentProduct.stock||0;
+    }
+    document.getElementById(p+'Panel').style.display='block';
+}
+
+async function saveProductEdits(){
+    const min=parseInt(document.getElementById('editMinStock').value)||0;
+    const ideal=parseInt(document.getElementById('editIdealStock').value)||0;
+    showLoading(true);
+    try{await notionRequest(`/pages/${currentProduct.id}`,'PATCH',{properties:{'MINIMUM STOCK':{number:min},'IDEALE STOCK':{number:ideal}}});currentProduct.minStock=min;currentProduct.idealStock=ideal;showToast('Opgeslagen');document.getElementById('editPanel').style.display='none';}catch(e){showToast('Fout','error');}
+    showLoading(false);
+}
+
+async function saveStockCorrection(){
+    const val=parseInt(document.getElementById('editStockValue').value);
+    if(isNaN(val)){showToast('Ongeldige waarde','error');return;}
+    
+    // Calculate difference between new value and current stock
+    const currentStock=currentProduct.stock||0;
+    const difference=val-currentStock;
+    
+    if(difference===0){showToast('Geen wijziging','error');return;}
+    
+    showLoading(true);
+    try{
+        // Create a registration for the stock correction
+        await notionRequest('/pages','POST',{
+            parent:{database_id:REGISTRATIONS_DB},
+            properties:{
+                'Omschrijving':{title:[{text:{content:`${currentProduct.name} - Stock correctie`}}]},
+                'Actie':{select:{name:'Stock correctie'}},
+                'Aantal':{number:difference},
+                'Medewerker':{rich_text:[{text:{content:userName}}]},
+                'Eenheidsprijs':{number:currentProduct.price||0},
+                'Datum':{date:{start:new Date().toISOString().split('T')[0]}},
+                'Barcode':{rich_text:[{text:{content:currentProduct.barcode||''}}]},
+                'Stock Artikel':{relation:[{id:currentProduct.id}]}
+            }
+        });
+        
+        currentProduct.stock=val;
+        const idx=products.findIndex(x=>x.id===currentProduct.id);
+        if(idx>=0)products[idx].stock=val;
+        document.getElementById('productStock').textContent=val;
+        document.getElementById('editStockValue').value='';
+        
+        addToScanLog({
+            productId:currentProduct.id,
+            productName:currentProduct.name,
+            projectId:'',
+            projectName:'Stock correctie',
+            projectNumber:0,
+            action:'Stock correctie',
+            quantity:difference,
+            price:currentProduct.price||0,
+            margin:currentProduct.margin||0.2
+        });
+        
+        showToast(`Stock aangepast: ${currentStock} → ${val} (${difference>0?'+':''}${difference})`);
+    }catch(e){
+        console.error(e);
+        showToast('Fout bij opslaan','error');
+    }
+    showLoading(false);
+}
+
+function scanForLink(){showScreen('scan');showToast('Scan barcode om te koppelen');}
+
+async function saveLinkedBarcode(){
+    const bc=document.getElementById('linkBarcodeInput').value.trim();
+    if(!bc){showToast('Voer barcode in','error');return;}
+    showLoading(true);
+    try{await notionRequest(`/pages/${currentProduct.id}`,'PATCH',{properties:{' ID (barcode)':{rich_text:[{text:{content:bc}}]}}});currentProduct.barcode=bc;document.getElementById('productBarcode').textContent=bc;document.getElementById('currentBarcode').textContent=bc;document.getElementById('linkBarcodeInput').value='';document.getElementById('linkPanel').style.display='none';showToast('Barcode gekoppeld');}catch(e){showToast('Fout','error');}
+    showLoading(false);
+}
+
+// === PHOTO ===
+async function startPhotoCapture(){
+    if(capturedPhoto)return;
+    try{photoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('photoVideo');v.srcObject=photoStream;v.style.display='block';document.getElementById('photoPlaceholder').style.display='none';v.onclick=e=>{e.stopPropagation();takePhoto();};}catch(e){showToast('Camera niet beschikbaar','error');}
+}
+
+function takePhoto(){
+    const v=document.getElementById('photoVideo');const c=document.createElement('canvas');const s=Math.min(v.videoWidth,v.videoHeight);c.width=c.height=s;
+    c.getContext('2d').drawImage(v,(v.videoWidth-s)/2,(v.videoHeight-s)/2,s,s,0,0,s,s);
+    capturedPhoto=c.toDataURL('image/jpeg',0.8);stopPhotoStream();
+    document.getElementById('photoPreview').src=capturedPhoto;document.getElementById('photoPreview').style.display='block';
+    document.getElementById('photoActions').style.display='flex';document.getElementById('photoCaptureBox').style.borderStyle='solid';document.getElementById('photoCaptureBox').style.borderColor='var(--success)';
+}
+
+function retakePhoto(){capturedPhoto=null;document.getElementById('photoPreview').style.display='none';document.getElementById('photoActions').style.display='none';document.getElementById('photoPlaceholder').style.display='flex';document.getElementById('photoCaptureBox').style.borderStyle='dashed';document.getElementById('photoCaptureBox').style.borderColor='var(--border)';startPhotoCapture();}
+function stopPhotoStream(){if(photoStream){photoStream.getTracks().forEach(t=>t.stop());photoStream=null;}document.getElementById('photoVideo').style.display='none';}
+
+async function savePhoto(){
+    if(!capturedPhoto)return;
+    const key=localStorage.getItem('imgbbApiKey')||'';
+    if(!key){const k=prompt('imgBB API key nodig. Ga naar api.imgbb.com:');if(!k)return;localStorage.setItem('imgbbApiKey',k);savePhoto();return;}
+    showLoading(true);
+    try{
+        const fd=new FormData();fd.append('image',capturedPhoto.split(',')[1]);
+        const r=await fetch(`https://api.imgbb.com/1/upload?key=${key}`,{method:'POST',body:fd});
+        const d=await r.json();if(!d.success)throw new Error('Upload mislukt');
+        const url=d.data.url;
+        await notionRequest(`/pages/${currentProduct.id}`,'PATCH',{properties:{'Afbeelding':{files:[{type:'external',name:'product.jpg',external:{url}}]}}});
+        currentProduct.imageUrl=url;document.getElementById('productImage').innerHTML=`<img src="${url}">`;
+        document.getElementById('photoPanel').style.display='none';capturedPhoto=null;showToast('Foto opgeslagen');
+    }catch(e){showToast('Fout','error');}
+    showLoading(false);
+}
+
+// === NEW ARTICLE ===
+function scanForNewArticle(){showScreen('scan');}
+function generateBarcode(){const c='DM'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,5).toUpperCase();newArticleBarcode=c;document.getElementById('newArticleBarcode').textContent=c;document.getElementById('newBarcodeInput').value=c;}
+function updateNewBarcode(v){newArticleBarcode=v;document.getElementById('newArticleBarcode').textContent=v||'-';}
+
+async function saveNewArticle(){
+    const name=document.getElementById('newName').value.trim();
+    const cat=document.getElementById('newCategory').value;
+    const unit=document.getElementById('newUnit').value;
+    if(!name||!cat||!unit||!newArticleBarcode){showToast('Vul verplichte velden in','error');return;}
+    if(products.find(p=>p.barcode===newArticleBarcode)){showToast('Barcode bestaat al','error');return;}
+    showLoading(true);
+    try{
+        const props={'OMSCHRIJVIN':{title:[{text:{content:name}}]},' ID (barcode)':{rich_text:[{text:{content:newArticleBarcode}}]},'HOOFDGROEP':{select:{name:cat}},'EENHEID':{select:{name:unit}},'TYPE ITEM':{select:{name:'STOCK'}}};
+        const price=parseFloat(document.getElementById('newPrice').value)||0;
+        const stock=parseInt(document.getElementById('newStock').value)||0;
+        const supp=document.getElementById('newSupplier').value;
+        if(price)props['AANKOOP PRIJS ']={number:price};
+        if(stock)props['STOCK (begin 2023) manual overrule']={number:stock};
+        if(supp)props['Leverancier']={select:{name:supp}};
+        const res=await notionRequest('/pages','POST',{parent:{database_id:STOCK_DB},properties:props});
+        const np={id:res.id,name,barcode:newArticleBarcode,category:cat,unit,price,stock,supplier:supp};
+        products.push(np);products.sort((a,b)=>a.name.localeCompare(b.name));
+        ['newName','newCategory','newUnit','newPrice','newStock','newSupplier','newBarcodeInput'].forEach(id=>document.getElementById(id).value='');
+        newArticleBarcode='';document.getElementById('newArticleBarcode').textContent='-';
+        showToast('Artikel aangemaakt!');selectProduct(np);
+    }catch(e){showToast('Fout','error');}
+    showLoading(false);
+}
+
+// === HISTORY & LOG ===
+function addToHistory(item){history.unshift({...item,time:new Date().toISOString()});history=history.slice(0,50);localStorage.setItem('scan_history',JSON.stringify(history));renderHistory();updateStats();}
+function renderHistory(){const list=document.getElementById('historyList');const today=new Date().toDateString();const h=history.filter(x=>new Date(x.time).toDateString()===today);if(!h.length){list.innerHTML='<div class="empty-state"><div class="empty-state-icon">🕐</div><div>Nog geen activiteit</div></div>';return;}list.innerHTML=h.slice(0,8).map(i=>`<div class="history-item"><div class="history-icon ${i.amount<0?'out':'in'}">${i.amount<0?'↑':'↓'}</div><div class="history-info"><div class="history-name">${esc(i.name)}</div><div class="history-details">${esc(i.project)} • ${new Date(i.time).toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})}</div></div><div class="history-amount ${i.amount<0?'out':'in'}">${i.amount>0?'+':''}${i.amount}</div></div>`).join('');}
+
+function addToScanLog(item){scanLog.unshift({...item,time:new Date().toISOString()});scanLog=scanLog.slice(0,500);localStorage.setItem('scan_log',JSON.stringify(scanLog));}
+
+function renderLog(){
+    const list=document.getElementById('logList');
+    const byProj={};scanLog.forEach(e=>{if(!byProj[e.projectId])byProj[e.projectId]={id:e.projectId,name:e.projectName,number:e.projectNumber,items:[],totalCost:0,totalMargin:0};const m=marginOverrides[`${e.projectId}_${e.productId}`]??e.margin??0.2;const c=Math.abs(e.quantity)*(e.price||0);byProj[e.projectId].items.push({...e,margin:m,cost:c,withMargin:c*(1+m)});byProj[e.projectId].totalCost+=c;byProj[e.projectId].totalMargin+=c*(1+m);});
+    const pList=Object.values(byProj).sort((a,b)=>b.number-a.number);
+    if(!pList.length){list.innerHTML='<div class="empty-state"><div class="empty-state-icon">📊</div><div>Nog geen registraties</div></div>';return;}
+    list.innerHTML=pList.map((proj,idx)=>{const byProd={};proj.items.forEach(i=>{if(!byProd[i.productId])byProd[i.productId]={id:i.productId,name:i.productName,qty:0,price:i.price,margin:i.margin,projectId:i.projectId};byProd[i.productId].qty+=i.quantity;});const prodList=Object.values(byProd);return `<div class="log-card"><div class="log-header" onclick="toggleLog(${idx})"><div class="log-info"><div class="log-project">${proj.number} - ${esc(proj.name)}</div><div class="log-meta">${proj.items.length} registraties</div></div><div class="log-totals"><div class="log-total-cost">€${proj.totalCost.toFixed(2)}</div><div class="log-total-margin">€${proj.totalMargin.toFixed(2)}</div></div><div class="log-chevron" id="logChevron${idx}">▶</div></div><div class="log-details" id="logDetails${idx}">${prodList.map(p=>{const c=Math.abs(p.qty)*p.price,wm=c*(1+p.margin);return `<div class="log-item"><div class="log-item-name">${esc(p.name)}<br><span style="font-size:11px;color:var(--text-muted)">${Math.abs(p.qty)}× €${p.price.toFixed(2)}</span></div><div class="log-item-margin"><input type="number" value="${Math.round(p.margin*100)}" onchange="updateMargin('${p.projectId}_${p.id}',this.value)" onclick="event.stopPropagation()"><span style="font-size:11px;color:var(--text-muted)">%</span></div><div class="log-item-totals"><div class="log-item-cost">€${c.toFixed(2)}</div><div class="log-item-price">€${wm.toFixed(2)}</div></div></div>`;}).join('')}<button class="btn btn-secondary btn-full" onclick="syncMargins('${proj.id}')" style="margin-top:12px">☁️ Marges → Notion</button></div></div>`;}).join('');
+}
+
+function toggleLog(idx){const d=document.getElementById('logDetails'+idx),c=document.getElementById('logChevron'+idx);const v=d.classList.toggle('visible');c.textContent=v?'▼':'▶';}
+function updateMargin(key,val){marginOverrides[key]=Math.max(0,parseInt(val)||0)/100;localStorage.setItem('margin_overrides',JSON.stringify(marginOverrides));renderLog();}
+async function syncMargins(projId){const upd=Object.entries(marginOverrides).filter(([k])=>k.startsWith(projId+'_')).map(([k,v])=>({productId:k.split('_')[1],margin:v}));if(!upd.length){showToast('Geen aangepaste marges');return;}if(!confirm(`${upd.length} marge(s) opslaan naar Notion?`))return;showLoading(true);for(const u of upd){try{await notionRequest(`/pages/${u.productId}`,'PATCH',{properties:{'MARGE / VERWERKINGSTOESLAG':{number:u.margin}}});}catch(e){}}showLoading(false);showToast('Marges opgeslagen');}
+function clearScanLog(){if(!confirm('Scan log wissen?'))return;scanLog=[];localStorage.setItem('scan_log','[]');renderLog();}
+
+// === CATEGORIES & FAVORITES ===
+function renderCategoryPills(){document.getElementById('categoryPills').innerHTML=categories.map(c=>`<button class="filter-pill ${activeCategory===c.id?'active':''}" onclick="setCategory('${c.id}')">${c.icon} ${c.name}</button>`).join('');}
+function setCategory(id){activeCategory=id;renderCategoryPills();filterProducts();}
+function getCategoryIcon(cat){return categories.find(c=>c.id===cat)?.icon||'📦';}
+function toggleCurrentFavorite(){if(!currentProduct)return;toggleFavorite(currentProduct.id);document.getElementById('productFavoriteBtn').textContent=favorites.includes(currentProduct.id)?'⭐':'☆';}
+function toggleFavorite(id){if(favorites.includes(id))favorites=favorites.filter(x=>x!==id);else favorites.push(id);localStorage.setItem('favorites',JSON.stringify(favorites));renderFavorites();}
+function renderFavorites(){const card=document.getElementById('favoritesCard'),list=document.getElementById('favoritesList');const favs=products.filter(p=>favorites.includes(p.id));if(!favs.length){card.style.display='none';return;}card.style.display='block';list.innerHTML=favs.slice(0,5).map(p=>`<div class="product-item" onclick="selectProduct(products.find(x=>x.id==='${p.id}'))" style="padding:10px"><div class="product-icon" style="width:36px;height:36px;font-size:16px">${getCategoryIcon(p.category)}</div><div class="product-info"><div class="product-name">${esc(p.name)}</div></div><div class="product-stock ${(p.stock||0)<=1?'low':'ok'}">${p.stock||0}</div></div>`).join('');}
+
+// === PROJECTS & USERS ===
+function renderProjectSelect(){const sel=document.getElementById('projectSelect');sel.innerHTML=`<option value="">-- Project kiezen --</option><optgroup label="Actief">${activeProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup><optgroup label="Archief">${archivedProjects.slice(0,20).map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;}
+function renderUserSelect(){document.getElementById('userSelect').innerHTML=users.map(u=>`<option value="${u}" ${u===userName?'selected':''}>${u}</option>`).join('');}
+function changeUser(name){userName=name;localStorage.setItem('user_name',name);document.getElementById('headerUser').textContent=name+' ▼';}
+function addUser(){const name=document.getElementById('newUserInput').value.trim();if(!name)return;if(!users.includes(name)){users.push(name);localStorage.setItem('users',JSON.stringify(users));renderUserSelect();}document.getElementById('newUserInput').value='';changeUser(name);}
+
+// === SETTINGS ===
+function saveApiKey(){const key=document.getElementById('settingsApiKey').value.trim();if(!key){showToast('Voer API key in','error');return;}testApiKey(key,false);}
+function reloadData(){loadProducts();loadProjects();}
+function clearAllData(){if(!confirm('Alle lokale data wissen?'))return;localStorage.clear();location.reload();}
+function updateStats(){const today=new Date().toDateString();document.getElementById('statToday').textContent=history.filter(h=>new Date(h.time).toDateString()===today).length;document.getElementById('statTotal').textContent=products.length;}
+
+// === MODALS & UTILS ===
+function openModal(id){document.getElementById(id).classList.add('visible');}
+function closeModal(id){document.getElementById(id).classList.remove('visible');}
+function openOrderModal(){if(!currentProduct)return;document.getElementById('orderQuantity').value=Math.max(1,(currentProduct.idealStock||10)-(currentProduct.stock||0));document.getElementById('orderEmail').value=localStorage.getItem('order_email')||'';document.getElementById('orderNote').value='';document.getElementById('orderProductInfo').innerHTML=`<strong>${esc(currentProduct.name)}</strong><br>Leverancier: ${currentProduct.supplier||'-'}<br>Stock: ${currentProduct.stock||0}`;openModal('orderModal');}
+function sendOrderEmail(){const qty=document.getElementById('orderQuantity').value,email=document.getElementById('orderEmail').value,note=document.getElementById('orderNote').value;localStorage.setItem('order_email',email);const subj=encodeURIComponent(`Bestelling: ${currentProduct.name}`),body=encodeURIComponent(`Product: ${currentProduct.name}\nAantal: ${qty} ${currentProduct.unit||'stuks'}\nLeverancier: ${currentProduct.supplier||'-'}\n\nStock: ${currentProduct.stock||0}\n${note?'\nOpmerking: '+note:''}\n\n${userName}`);window.open(`mailto:${email}?subject=${subj}&body=${body}`);closeModal('orderModal');}
+function showLoading(show){document.getElementById('loadingOverlay').classList.toggle('visible',show);}
+function showToast(msg,type='success'){const t=document.getElementById('toast');document.getElementById('toastIcon').textContent=type==='error'?'✕':'✓';document.getElementById('toastMessage').textContent=msg;t.classList.toggle('error',type==='error');t.classList.add('visible');setTimeout(()=>t.classList.remove('visible'),2500);}
+function esc(str){return str?str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+
+// === QR LABEL GENERATOR ===
+let qrSelectedProducts=new Set();
+let qrFilteredProducts=[];
+
+function filterQRProducts(){
+    const q=(document.getElementById('qrSearchInput')?.value||'').toLowerCase();
+    const noCodeOnly=document.getElementById('qrFilterNoCode')?.checked||false;
+    qrFilteredProducts=products.filter(p=>{
+        const matchesSearch=!q||p.name?.toLowerCase().includes(q)||p.barcode?.toLowerCase().includes(q);
+        const matchesNoCode=!noCodeOnly||!p.barcode||!p.barcode.startsWith('DM-');
+        return matchesSearch&&matchesNoCode;
+    });
+    renderQRProductList();
+}
+
+function renderQRProductList(){
+    const list=document.getElementById('qrProductList');
+    if(!qrFilteredProducts.length)qrFilteredProducts=[...products];
+    list.innerHTML=qrFilteredProducts.map(p=>{
+        const hasQR=p.barcode&&p.barcode.startsWith('DM-');
+        return `
+        <div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleQRSelect('${p.id}')">
+            <div style="width:24px;height:24px;border:2px solid ${qrSelectedProducts.has(p.id)?'var(--success)':'var(--border)'};border-radius:6px;margin-right:12px;display:flex;align-items:center;justify-content:center;background:${qrSelectedProducts.has(p.id)?'var(--success)':'transparent'};color:#000;font-size:14px">${qrSelectedProducts.has(p.id)?'✓':''}</div>
+            <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+                <div style="font-size:11px;color:${hasQR?'var(--success)':'var(--text-muted)'}">${hasQR?'✓ '+p.barcode:p.barcode||'Geen code'}</div>
+            </div>
+        </div>
+    `;}).join('');
+    updateQRCount();
+}
+
+function toggleQRSelect(id){
+    if(qrSelectedProducts.has(id))qrSelectedProducts.delete(id);
+    else qrSelectedProducts.add(id);
+    renderQRProductList();
+}
+
+function selectAllQR(){
+    qrFilteredProducts.forEach(p=>qrSelectedProducts.add(p.id));
+    renderQRProductList();
+}
+
+function deselectAllQR(){
+    qrSelectedProducts.clear();
+    renderQRProductList();
+}
+
+function updateQRCount(){
+    document.getElementById('qrSelectedCount').textContent=`${qrSelectedProducts.size} artikelen geselecteerd`;
+}
+
+async function getNextDMCode(){
+    // Find highest existing DM code
+    let maxNum=0;
+    products.forEach(p=>{
+        if(p.barcode&&p.barcode.startsWith('DM-')){
+            const num=parseInt(p.barcode.replace('DM-',''),10);
+            if(num>maxNum)maxNum=num;
+        }
+    });
+    return maxNum+1;
+}
+
+async function generateQRLabels(){
+    if(qrSelectedProducts.size===0){showToast('Selecteer eerst artikelen','error');return;}
+    
+    const format=document.querySelector('input[name="labelFormat"]:checked')?.value||'square';
+    const saveToNotion=document.getElementById('qrSaveToNotion')?.checked||false;
+    const selected=products.filter(p=>qrSelectedProducts.has(p.id));
+    
+    showLoading(true);
+    
+    // Generate DM codes for products without one
+    let nextCode=await getNextDMCode();
+    const productsWithCodes=[];
+    
+    for(const p of selected){
+        let code=p.barcode;
+        
+        // Generate new code if needed
+        if(!code||!code.startsWith('DM-')){
+            code='DM-'+String(nextCode).padStart(4,'0');
+            nextCode++;
+            
+            // Save to Notion if enabled
+            if(saveToNotion){
+                try{
+                    debugLog('QR code opslaan in Notion',{id:p.id,code});
+                    await notionRequest(`/pages/${p.id}`,'PATCH',{
+                        properties:{' ID (barcode)':{rich_text:[{text:{content:code}}]}}
+                    });
+                    // Update local product
+                    p.barcode=code;
+                    const idx=products.findIndex(x=>x.id===p.id);
+                    if(idx>=0)products[idx].barcode=code;
+                }catch(e){
+                    debugLog('QR code opslaan mislukt',e.message);
+                }
+            }
+        }
+        
+        productsWithCodes.push({...p,qrCode:code});
+    }
+    
+    showLoading(false);
+    
+    // Label dimensions based on format (Zebra ZD421 compatible)
+    const labelConfigs={
+        square:{w:'25mm',h:'25mm',qr:'20mm',nameSize:'6pt',codeSize:'5pt',layout:'column',nameMax:20},
+        small:{w:'32mm',h:'25mm',qr:'20mm',nameSize:'6pt',codeSize:'5pt',layout:'row',nameMax:30},
+        medium:{w:'51mm',h:'25mm',qr:'20mm',nameSize:'7pt',codeSize:'6pt',layout:'row',nameMax:50}
+    };
+    const cfg=labelConfigs[format]||labelConfigs.square;
+    const isColumn=cfg.layout==='column';
+    
+    const printWindow=window.open('','_blank');
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>QR Labels - DM Stock (Zebra ZD421)</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        @page{size:auto;margin:0}
+        body{font-family:Arial,sans-serif;padding:2mm}
+        .labels{display:flex;flex-wrap:wrap;gap:1mm}
+        .label{
+            width:${cfg.w};
+            height:${cfg.h};
+            border:0.3px dashed #ccc;
+            padding:1mm;
+            display:flex;
+            align-items:center;
+            ${isColumn?'flex-direction:column;justify-content:center;':''}
+            page-break-inside:avoid;
+            overflow:hidden;
+            background:#fff;
+        }
+        .qr{
+            width:${cfg.qr};
+            height:${cfg.qr};
+            flex-shrink:0;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        .qr canvas{width:100%!important;height:100%!important}
+        .info{
+            ${isColumn?'text-align:center;margin-top:0.5mm;width:100%;':'flex:1;padding-left:1.5mm;'}
+            overflow:hidden;
+        }
+        .name{
+            font-size:${cfg.nameSize};
+            font-weight:bold;
+            line-height:1.1;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            ${isColumn?'white-space:nowrap;':'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;'}
+        }
+        .code{
+            font-size:${cfg.codeSize};
+            color:#333;
+            font-family:'Courier New',monospace;
+            margin-top:0.3mm;
+            letter-spacing:0.3px;
+        }
+        @media print{
+            body{padding:0}
+            .label{border:none}
+            .no-print{display:none!important}
+        }
+        .no-print{
+            position:fixed;
+            top:0;
+            left:0;
+            right:0;
+            background:#333;
+            color:#fff;
+            padding:15px 20px;
+            display:flex;
+            align-items:center;
+            gap:15px;
+            z-index:100;
+        }
+        .no-print button{
+            padding:10px 20px;
+            font-size:14px;
+            cursor:pointer;
+            border:none;
+            border-radius:5px;
+            background:#4CAF50;
+            color:#fff;
+            font-weight:bold;
+        }
+        .floating-print{
+            position:fixed;
+            bottom:20px;
+            right:20px;
+            padding:15px 30px;
+            font-size:18px;
+            background:#4CAF50;
+            color:#fff;
+            border:none;
+            border-radius:10px;
+            cursor:pointer;
+            box-shadow:0 4px 15px rgba(0,0,0,0.3);
+            z-index:101;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="position:relative">
+        <strong>🖨️ Zebra ZD421 - ${productsWithCodes.length} labels (${cfg.w} x ${cfg.h})</strong>
+        <span style="font-size:12px;opacity:0.8;margin-left:10px">Stel printer in op juiste labelformaat</span>
+    </div>
+    <button class="floating-print no-print" onclick="window.print()">🖨️ Printen</button>
+    <div style="height:50px" class="no-print"></div>
+    <div class="labels" id="labels"></div>
+    <div style="height:80px" class="no-print"></div>
+    <script>
+        const products=${JSON.stringify(productsWithCodes)};
+        const isColumn=${isColumn};
+        const nameMax=${cfg.nameMax};
+        const container=document.getElementById('labels');
+        
+        products.forEach((p,i)=>{
+            const label=document.createElement('div');
+            label.className='label';
+            const shortName=p.name.length>nameMax?p.name.substring(0,nameMax-2)+'..':p.name;
+            
+            if(isColumn){
+                label.innerHTML=\`
+                    <div class="qr" id="qr\${i}"></div>
+                    <div class="info">
+                        <div class="name">\${shortName}</div>
+                    </div>
+                \`;
+            }else{
+                label.innerHTML=\`
+                    <div class="qr" id="qr\${i}"></div>
+                    <div class="info">
+                        <div class="name">\${p.name}</div>
+                        <div class="code">\${p.qrCode}</div>
+                    </div>
+                \`;
+            }
+            container.appendChild(label);
+            
+            QRCode.toCanvas(document.createElement('canvas'),p.qrCode,{width:200,margin:0},function(err,canvas){
+                if(!err)document.getElementById('qr'+i).appendChild(canvas);
+            });
+        });
+    <\/script>
+</body>
+</html>
+    `);
+    printWindow.document.close();
+    
+    showToast(`${productsWithCodes.length} labels gegenereerd`);
+}
+
+// Init QR products when screen opens
+const origShowScreen=showScreen;
+showScreen=function(screen){
+    origShowScreen(screen);
+    if(screen==='qrlabels'){
+        qrFilteredProducts=[...products];
+        renderQRProductList();
+        // Init label format radio buttons
+        document.querySelectorAll('input[name="labelFormat"]').forEach(radio=>{
+            radio.addEventListener('change',function(){
+                document.querySelectorAll('.label-format-option').forEach(opt=>{
+                    opt.style.borderColor=opt.querySelector('input').checked?'var(--accent)':'var(--border)';
+                });
+            });
+            // Set initial state
+            const opt=radio.closest('.label-format-option');
+            if(opt)opt.style.borderColor=radio.checked?'var(--accent)':'var(--border)';
+        });
+    }
+};
+
+// Init debug mode from localStorage or URL param (?debug=1)
+(function initDebug(){
+    // Check URL param first
+    const urlParams=new URLSearchParams(window.location.search);
+    if(urlParams.get('debug')==='1'){
+        localStorage.setItem('debug_mode','1');
+    }
+    
+    debugMode=localStorage.getItem('debug_mode')==='1';
+    if(debugMode){
+        document.getElementById('debugToggle').checked=true;
+        document.getElementById('debugConsole').style.display='block';
+        document.getElementById('debugToggleKnob').style.left='27px';
+        document.getElementById('debugToggleKnob').style.background='var(--success)';
+        debugLog('App gestart, debug modus actief');
+        debugLog('API Key aanwezig',{hasKey:!!apiKey,keyStart:apiKey?apiKey.substring(0,10)+'...':'geen'});
+    }
+})();
+
+// Log errors globally
+window.onerror=function(msg,url,line,col,error){
+    debugLog('JS ERROR',{msg,line,col});
+    console.error('Global error:',msg,line,col,error);
+};
+</script>
+</body>
+</html>
