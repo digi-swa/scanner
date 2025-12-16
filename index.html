@@ -339,7 +339,8 @@
                         </div>
                     </div>
                     
-                    </div>
+                    <!-- Extra ruimte voor mobiel scrollen -->
+                    <div style="height:120px"></div>
                 </div>
 
                 <!-- ARTICLES -->
@@ -422,6 +423,9 @@
                             <button class="btn btn-primary" onclick="savePhoto()" style="flex:1">💾 Opslaan</button>
                         </div>
                     </div>
+                    
+                    <!-- Extra ruimte voor mobiel scrollen -->
+                    <div style="height:120px"></div>
                 </div>
 
                 <!-- LOG -->
@@ -429,6 +433,9 @@
                     <div class="section-title">📊 Project Overzicht</div>
                     <div id="logList"><div class="empty-state"><div class="empty-state-icon">📊</div><div>Nog geen registraties</div></div></div>
                     <button class="btn btn-secondary btn-full" onclick="clearScanLog()" style="margin-top:16px;opacity:0.6">🗑️ Log wissen</button>
+                    
+                    <!-- Extra ruimte voor mobiel scrollen -->
+                    <div style="height:120px"></div>
                 </div>
 
                 <!-- MORE -->
@@ -461,6 +468,9 @@
                         </div>
                         <button class="btn btn-secondary btn-full" onclick="clearAllData()" style="opacity:0.6;margin-top:10px">🗑️ Alle data wissen</button>
                     </div>
+                    
+                    <!-- Extra ruimte voor mobiel scrollen -->
+                    <div style="height:120px"></div>
                 </div>
 
                 <!-- QR LABELS -->
@@ -495,35 +505,38 @@
                     <div class="card">
                         <div class="section-title">🏷️ Label Formaat</div>
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-                            <label class="label-format-option" style="display:flex;flex-direction:column;align-items:center;padding:12px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)">
+                            <label class="label-format-option" onclick="selectLabelFormat('square')" style="display:flex;flex-direction:column;align-items:center;padding:16px 8px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--accent)" id="labelFormatSquare">
                                 <input type="radio" name="labelFormat" value="square" checked style="display:none">
-                                <span style="font-size:20px;margin-bottom:4px">⬜</span>
-                                <span style="font-size:11px;font-weight:600">Vierkant</span>
-                                <span style="font-size:9px;color:var(--text-muted)">25x25mm</span>
+                                <span style="font-size:24px;margin-bottom:6px">⬜</span>
+                                <span style="font-size:12px;font-weight:600">Vierkant</span>
+                                <span style="font-size:10px;color:var(--text-muted)">25x25mm</span>
                             </label>
-                            <label class="label-format-option" style="display:flex;flex-direction:column;align-items:center;padding:12px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)">
+                            <label class="label-format-option" onclick="selectLabelFormat('small')" style="display:flex;flex-direction:column;align-items:center;padding:16px 8px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)" id="labelFormatSmall">
                                 <input type="radio" name="labelFormat" value="small" style="display:none">
-                                <span style="font-size:20px;margin-bottom:4px">▬</span>
-                                <span style="font-size:11px;font-weight:600">Klein</span>
-                                <span style="font-size:9px;color:var(--text-muted)">32x25mm</span>
+                                <span style="font-size:24px;margin-bottom:6px">▬</span>
+                                <span style="font-size:12px;font-weight:600">Klein</span>
+                                <span style="font-size:10px;color:var(--text-muted)">32x25mm</span>
                             </label>
-                            <label class="label-format-option" style="display:flex;flex-direction:column;align-items:center;padding:12px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)">
+                            <label class="label-format-option" onclick="selectLabelFormat('medium')" style="display:flex;flex-direction:column;align-items:center;padding:16px 8px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)" id="labelFormatMedium">
                                 <input type="radio" name="labelFormat" value="medium" style="display:none">
-                                <span style="font-size:20px;margin-bottom:4px">▭</span>
-                                <span style="font-size:11px;font-weight:600">Medium</span>
-                                <span style="font-size:9px;color:var(--text-muted)">51x25mm</span>
+                                <span style="font-size:24px;margin-bottom:6px">▭</span>
+                                <span style="font-size:12px;font-weight:600">Medium</span>
+                                <span style="font-size:10px;color:var(--text-muted)">51x25mm</span>
                             </label>
                         </div>
-                        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">💡 Zebra ZD421 compatibel. Stel je printer in op het juiste labelformaat.</p>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">💡 Zebra ZD421 compatibel</p>
                         <div style="margin-top:12px">
                             <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-                                <input type="checkbox" id="qrSaveToNotion" checked style="width:18px;height:18px">
+                                <input type="checkbox" id="qrSaveToNotion" checked style="width:20px;height:20px">
                                 QR codes opslaan in Notion
                             </label>
                         </div>
                     </div>
                     
                     <button class="btn btn-primary btn-full" onclick="generateQRLabels()">🖨️ Labels Genereren & Printen</button>
+                    
+                    <!-- Extra ruimte voor mobiel scrollen -->
+                    <div style="height:120px"></div>
                 </div>
 
                 <!-- NEW ARTICLE -->
@@ -551,6 +564,9 @@
                         <div class="form-group"><label class="form-label">Leverancier</label><select class="select-field" id="newSupplier"><option value="">Kies...</option><option value="NV Berner Belgien">Berner</option><option value="LMC">LMC</option><option value="LECOT">Lecot</option><option value="Festool">Festool</option><option value="Häfele">Häfele</option></select></div>
                     </div>
                     <button class="btn btn-success btn-full" onclick="saveNewArticle()">✓ Artikel Opslaan</button>
+                    
+                    <!-- Extra ruimte voor mobiel scrollen -->
+                    <div style="height:120px"></div>
                 </div>
             </main>
 
@@ -1372,6 +1388,21 @@ function updateQRCount(){
     document.getElementById('qrSelectedCount').textContent=`${qrSelectedProducts.size} artikelen geselecteerd`;
 }
 
+function selectLabelFormat(format){
+    // Update radio buttons
+    document.querySelectorAll('input[name="labelFormat"]').forEach(r=>{
+        r.checked=(r.value===format);
+    });
+    // Update visual styling
+    ['square','small','medium'].forEach(f=>{
+        const el=document.getElementById('labelFormat'+f.charAt(0).toUpperCase()+f.slice(1));
+        if(el){
+            el.style.borderColor=(f===format)?'var(--accent)':'var(--border)';
+        }
+    });
+    debugLog('Label formaat geselecteerd',format);
+}
+
 async function getNextDMCode(){
     // Find highest existing DM code
     let maxNum=0;
@@ -1591,17 +1622,8 @@ showScreen=function(screen){
     if(screen==='qrlabels'){
         qrFilteredProducts=[...products];
         renderQRProductList();
-        // Init label format radio buttons
-        document.querySelectorAll('input[name="labelFormat"]').forEach(radio=>{
-            radio.addEventListener('change',function(){
-                document.querySelectorAll('.label-format-option').forEach(opt=>{
-                    opt.style.borderColor=opt.querySelector('input').checked?'var(--accent)':'var(--border)';
-                });
-            });
-            // Set initial state
-            const opt=radio.closest('.label-format-option');
-            if(opt)opt.style.borderColor=radio.checked?'var(--accent)':'var(--border)';
-        });
+        // Reset to default format (square)
+        selectLabelFormat('square');
     }
 };
 
