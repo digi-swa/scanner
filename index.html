@@ -370,7 +370,10 @@
                             <div class="stat-box"><div class="stat-box-value stock" id="productStock">-</div><div class="stat-box-label">Stock</div></div>
                             <div class="stat-box"><div class="stat-box-value" id="productUnit">-</div><div class="stat-box-label">Eenheid</div></div>
                         </div>
-                        <select class="select-field" id="projectSelect"><option value="">-- Project kiezen --</option></select>
+                        <div style="margin-bottom:12px">
+                            <select class="select-field" id="projectSelect" style="margin-bottom:8px"><option value="">-- Project kiezen --</option></select>
+                            <button class="btn btn-secondary btn-full" id="loadMoreProjectsBtn" onclick="toggleAllProjects()" style="padding:10px;font-size:12px;display:none">📂 Meer projecten laden...</button>
+                        </div>
                         <div class="quantity-section">
                             <div class="quantity-control">
                                 <button class="quantity-btn" onclick="changeQuantity(-1)">−</button>
@@ -604,7 +607,8 @@ const REGISTRATIONS_DB='2412e803e23648a9a55df3b38975a84d';
 let apiKey=localStorage.getItem('notion_api_key')||'';
 let users=JSON.parse(localStorage.getItem('users')||'["BAS"]');
 let userName=localStorage.getItem('user_name')||'BAS';
-let products=[],filteredProducts=[],projects=[],activeProjects=[],archivedProjects=[];
+let products=[],filteredProducts=[],projects=[],activeProjects=[],archivedProjects=[],inUitvoeringProjects=[],otherActiveProjects=[];
+let showAllProjects=false;
 let favorites=JSON.parse(localStorage.getItem('favorites')||'[]');
 let history=JSON.parse(localStorage.getItem('scan_history')||'[]');
 let scanLog=JSON.parse(localStorage.getItem('scan_log')||'[]');
@@ -741,16 +745,42 @@ async function loadProducts(){
 
 async function loadProjects(){
     try{
-        const [resA,resB]=await Promise.all([
-            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{filter:{and:[{property:'FASE PROJECT',status:{does_not_equal:'Gearchiveerd'}},{property:'Archiveren',checkbox:{equals:false}}]},sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],page_size:100}),
-            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{filter:{or:[{property:'FASE PROJECT',status:{equals:'Gearchiveerd'}},{property:'Archiveren',checkbox:{equals:true}}]},sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],page_size:50})
+        const [resInUitvoering, resOther, resArchived]=await Promise.all([
+            // In uitvoering
+            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{
+                filter:{property:'FASE PROJECT',status:{equals:'In uitvoering'}},
+                sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],
+                page_size:100
+            }),
+            // Andere actieve (niet in uitvoering, niet gearchiveerd)
+            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{
+                filter:{and:[
+                    {property:'FASE PROJECT',status:{does_not_equal:'In uitvoering'}},
+                    {property:'FASE PROJECT',status:{does_not_equal:'Gearchiveerd'}},
+                    {property:'Archiveren',checkbox:{equals:false}}
+                ]},
+                sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],
+                page_size:100
+            }),
+            // Gearchiveerd
+            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{
+                filter:{or:[
+                    {property:'FASE PROJECT',status:{equals:'Gearchiveerd'}},
+                    {property:'Archiveren',checkbox:{equals:true}}
+                ]},
+                sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],
+                page_size:50
+            })
         ]);
-        const map=p=>({id:p.id,name:p.properties['Project name  (KLANT_PROJECTNAAM)']?.title?.[0]?.plain_text||'',number:p.properties['PROJECT NUMBER  (new)']?.unique_id?.number||0});
-        activeProjects=resA.results.map(map).filter(p=>p.name);
-        archivedProjects=resB.results.map(map).filter(p=>p.name);
+        const map=p=>({id:p.id,name:p.properties['Project name  (KLANT_PROJECTNAAM)']?.title?.map(t=>t.plain_text).join('')||'',number:p.properties['PROJECT NUMBER  (new)']?.unique_id?.number||0,fase:p.properties['FASE PROJECT']?.status?.name||''});
+        inUitvoeringProjects=resInUitvoering.results.map(map).filter(p=>p.name);
+        otherActiveProjects=resOther.results.map(map).filter(p=>p.name);
+        archivedProjects=resArchived.results.map(map).filter(p=>p.name);
+        activeProjects=[...inUitvoeringProjects,...otherActiveProjects];
         projects=[...activeProjects,...archivedProjects];
+        debugLog('Projecten geladen',{inUitvoering:inUitvoeringProjects.length,other:otherActiveProjects.length,archived:archivedProjects.length});
         renderProjectSelect();
-    }catch(e){console.error(e);}
+    }catch(e){console.error(e);debugLog('Projecten laden fout',e.message);}
 }
 
 // === NAVIGATION ===
@@ -1331,7 +1361,17 @@ function selectProduct(p){
     document.getElementById('currentStockDisplay').textContent=p.stock||0;
     document.getElementById('stockCorrectionValue').value='';
     const sel=document.getElementById('projectSelect');
-    if(lastProjectId&&(Date.now()-lastProjectTime)<PROJECT_TIMEOUT)sel.value=lastProjectId;else sel.value='';
+    if(lastProjectId&&(Date.now()-lastProjectTime)<PROJECT_TIMEOUT){
+        // Check of project in uitvoering staat, anders laad alle projecten
+        const inCurrentList=inUitvoeringProjects.some(pr=>pr.id===lastProjectId);
+        if(!inCurrentList&&!showAllProjects){
+            showAllProjects=true;
+            renderProjectSelect();
+        }
+        sel.value=lastProjectId;
+    }else{
+        sel.value='';
+    }
     hideAllPanels();showScreen('product');
 }
 
@@ -1950,7 +1990,37 @@ function toggleFavorite(id){if(favorites.includes(id))favorites=favorites.filter
 function renderFavorites(){const card=document.getElementById('favoritesCard'),list=document.getElementById('favoritesList');const favs=products.filter(p=>favorites.includes(p.id));if(!favs.length){card.style.display='none';return;}card.style.display='block';list.innerHTML=favs.slice(0,5).map(p=>`<div class="product-item" onclick="selectProduct(products.find(x=>x.id==='${p.id}'))" style="padding:10px"><div class="product-icon" style="width:36px;height:36px;font-size:16px">${getCategoryIcon(p.category)}</div><div class="product-info"><div class="product-name">${esc(p.name)}</div></div><div class="product-stock ${(p.stock||0)<=1?'low':'ok'}">${p.stock||0}</div></div>`).join('');}
 
 // === PROJECTS & USERS ===
-function renderProjectSelect(){const sel=document.getElementById('projectSelect');sel.innerHTML=`<option value="">-- Project kiezen --</option><optgroup label="Actief">${activeProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup><optgroup label="Archief">${archivedProjects.slice(0,20).map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;}
+function renderProjectSelect(){
+    const sel=document.getElementById('projectSelect');
+    const loadMoreBtn=document.getElementById('loadMoreProjectsBtn');
+    
+    if(showAllProjects){
+        // Toon alle projecten
+        sel.innerHTML=`<option value="">-- Project kiezen --</option>
+            <optgroup label="🔨 In uitvoering">${inUitvoeringProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>
+            <optgroup label="📋 Andere actief">${otherActiveProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>
+            <optgroup label="📁 Archief">${archivedProjects.slice(0,30).map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;
+        if(loadMoreBtn){
+            loadMoreBtn.textContent='📂 Minder projecten';
+            loadMoreBtn.style.display='block';
+        }
+    }else{
+        // Toon alleen in uitvoering
+        sel.innerHTML=`<option value="">-- Project kiezen --</option>
+            <optgroup label="🔨 In uitvoering">${inUitvoeringProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;
+        
+        const hasMore=otherActiveProjects.length>0||archivedProjects.length>0;
+        if(loadMoreBtn){
+            loadMoreBtn.textContent=`📂 Meer projecten laden (${otherActiveProjects.length+archivedProjects.length})...`;
+            loadMoreBtn.style.display=hasMore?'block':'none';
+        }
+    }
+}
+
+function toggleAllProjects(){
+    showAllProjects=!showAllProjects;
+    renderProjectSelect();
+}
 function renderUserSelect(){document.getElementById('userSelect').innerHTML=users.map(u=>`<option value="${u}" ${u===userName?'selected':''}>${u}</option>`).join('');}
 function changeUser(name){userName=name;localStorage.setItem('user_name',name);document.getElementById('headerUser').textContent=name+' ▼';}
 function addUser(){const name=document.getElementById('newUserInput').value.trim();if(!name)return;if(!users.includes(name)){users.push(name);localStorage.setItem('users',JSON.stringify(users));renderUserSelect();}document.getElementById('newUserInput').value='';changeUser(name);}
