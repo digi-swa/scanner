@@ -745,40 +745,41 @@ async function loadProducts(){
 
 async function loadProjects(){
     try{
-        const [resInUitvoering, resOther, resArchived]=await Promise.all([
-            // In uitvoering
-            notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{
-                filter:{property:'FASE PROJECT',status:{equals:'In uitvoering'}},
-                sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],
-                page_size:100
-            }),
-            // Andere actieve (niet in uitvoering, niet gearchiveerd)
+        const [resActief, resRest]=await Promise.all([
+            // Actief: NIET sales, on hold, done, gearchiveerd, missed
             notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{
                 filter:{and:[
-                    {property:'FASE PROJECT',status:{does_not_equal:'In uitvoering'}},
+                    {property:'FASE PROJECT',status:{does_not_equal:'Sales'}},
+                    {property:'FASE PROJECT',status:{does_not_equal:'On hold'}},
+                    {property:'FASE PROJECT',status:{does_not_equal:'Done'}},
                     {property:'FASE PROJECT',status:{does_not_equal:'Gearchiveerd'}},
+                    {property:'FASE PROJECT',status:{does_not_equal:'Missed'}},
                     {property:'Archiveren',checkbox:{equals:false}}
                 ]},
                 sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],
                 page_size:100
             }),
-            // Gearchiveerd
+            // Rest: sales, on hold, done, gearchiveerd, missed
             notionRequest(`/databases/${PROJECTS_DB}/query`,'POST',{
                 filter:{or:[
+                    {property:'FASE PROJECT',status:{equals:'Sales'}},
+                    {property:'FASE PROJECT',status:{equals:'On hold'}},
+                    {property:'FASE PROJECT',status:{equals:'Done'}},
                     {property:'FASE PROJECT',status:{equals:'Gearchiveerd'}},
+                    {property:'FASE PROJECT',status:{equals:'Missed'}},
                     {property:'Archiveren',checkbox:{equals:true}}
                 ]},
                 sorts:[{property:'PROJECT NUMBER  (new)',direction:'descending'}],
-                page_size:50
+                page_size:100
             })
         ]);
         const map=p=>({id:p.id,name:p.properties['Project name  (KLANT_PROJECTNAAM)']?.title?.map(t=>t.plain_text).join('')||'',number:p.properties['PROJECT NUMBER  (new)']?.unique_id?.number||0,fase:p.properties['FASE PROJECT']?.status?.name||''});
-        inUitvoeringProjects=resInUitvoering.results.map(map).filter(p=>p.name);
-        otherActiveProjects=resOther.results.map(map).filter(p=>p.name);
-        archivedProjects=resArchived.results.map(map).filter(p=>p.name);
-        activeProjects=[...inUitvoeringProjects,...otherActiveProjects];
-        projects=[...activeProjects,...archivedProjects];
-        debugLog('Projecten geladen',{inUitvoering:inUitvoeringProjects.length,other:otherActiveProjects.length,archived:archivedProjects.length});
+        inUitvoeringProjects=resActief.results.map(map).filter(p=>p.name);
+        otherActiveProjects=resRest.results.map(map).filter(p=>p.name);
+        archivedProjects=[];
+        activeProjects=[...inUitvoeringProjects];
+        projects=[...inUitvoeringProjects,...otherActiveProjects];
+        debugLog('Projecten geladen',{actief:inUitvoeringProjects.length,rest:otherActiveProjects.length});
         renderProjectSelect();
     }catch(e){console.error(e);debugLog('Projecten laden fout',e.message);}
 }
@@ -1997,21 +1998,20 @@ function renderProjectSelect(){
     if(showAllProjects){
         // Toon alle projecten
         sel.innerHTML=`<option value="">-- Project kiezen --</option>
-            <optgroup label="🔨 In uitvoering">${inUitvoeringProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>
-            <optgroup label="📋 Andere actief">${otherActiveProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>
-            <optgroup label="📁 Archief">${archivedProjects.slice(0,30).map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;
+            <optgroup label="🔨 Actief">${inUitvoeringProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>
+            <optgroup label="📁 Overige">${otherActiveProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;
         if(loadMoreBtn){
             loadMoreBtn.textContent='📂 Minder projecten';
             loadMoreBtn.style.display='block';
         }
     }else{
-        // Toon alleen in uitvoering
+        // Toon alleen actief
         sel.innerHTML=`<option value="">-- Project kiezen --</option>
-            <optgroup label="🔨 In uitvoering">${inUitvoeringProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;
+            <optgroup label="🔨 Actief">${inUitvoeringProjects.map(p=>`<option value="${p.id}">${p.number} - ${esc(p.name)}</option>`).join('')}</optgroup>`;
         
-        const hasMore=otherActiveProjects.length>0||archivedProjects.length>0;
+        const hasMore=otherActiveProjects.length>0;
         if(loadMoreBtn){
-            loadMoreBtn.textContent=`📂 Meer projecten laden (${otherActiveProjects.length+archivedProjects.length})...`;
+            loadMoreBtn.textContent=`📂 Meer projecten laden (${otherActiveProjects.length})...`;
             loadMoreBtn.style.display=hasMore?'block':'none';
         }
     }
