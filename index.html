@@ -245,11 +245,7 @@
         <div class="modal-overlay" id="actionsModal">
             <div class="modal-content">
                 <div class="modal-title">Meer acties</div>
-                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('edit')"><span class="more-action-icon">✏️</span>Bewerken</button>
-                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('link')"><span class="more-action-icon">🔗</span>Barcode koppelen</button>
-                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('qr')"><span class="more-action-icon">🏷️</span>QR code</button>
-                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('photo')"><span class="more-action-icon">📸</span>Foto toevoegen</button>
-                <button class="more-action-btn" onclick="closeModal('actionsModal');openOrderModal()"><span class="more-action-icon">📧</span>Bijbestellen</button>
+                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('edit')"><span class="more-action-icon">✏️</span>Min/ideale stock bewerken</button>
                 <div class="modal-buttons"><button class="btn btn-secondary" onclick="closeModal('actionsModal')">Sluiten</button></div>
             </div>
         </div>
@@ -390,60 +386,30 @@
                             <button class="more-action-btn" onclick="openModal('actionsModal')" style="justify-content:center;background:var(--bg)">••• Meer acties</button>
                         </div>
                     </div>
+                    
+                    <!-- Stock Correctie -->
+                    <div class="card">
+                        <div class="section-title">📊 Stock Correctie</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Huidige stock: <span id="currentStockDisplay">0</span></div>
+                        <div class="input-row">
+                            <input type="number" class="input-field" id="stockCorrectionValue" placeholder="Nieuwe stock waarde">
+                            <button class="btn btn-primary" onclick="doStockCorrection()">💾 Corrigeer</button>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Verschil wordt als registratie opgeslagen in Notion</div>
+                    </div>
+                    
+                    <!-- Bijbestellen -->
+                    <div class="card">
+                        <button class="btn btn-secondary btn-full" onclick="openOrderModal()">📧 Bijbestellen</button>
+                    </div>
+                    
                     <div class="card" id="editPanel" style="display:none">
                         <div class="section-title">✏️ Bewerken</div>
                         <div class="form-row">
                             <div class="form-group"><label class="form-label">Min. stock</label><input type="number" class="input-field" id="editMinStock"></div>
                             <div class="form-group"><label class="form-label">Ideale stock</label><input type="number" class="input-field" id="editIdealStock"></div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Stock correctie</label>
-                            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Huidige stock: <span id="currentStockValue">0</span></div>
-                            <div class="input-row"><input type="number" class="input-field" id="editStockValue" placeholder="Nieuwe waarde"><button class="btn btn-primary" onclick="saveStockCorrection()">💾</button></div>
-                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Verschil wordt als registratie opgeslagen</div>
-                        </div>
                         <button class="btn btn-secondary btn-full" onclick="saveProductEdits()">Opslaan & sluiten</button>
-                    </div>
-                    <div class="card" id="linkPanel" style="display:none">
-                        <div class="section-title">🔗 Barcode Koppelen</div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Huidige: <span id="currentBarcode">-</span></div>
-                        <div class="input-row">
-                            <input type="text" class="input-field" id="linkBarcodeInput" placeholder="Nieuwe barcode...">
-                            <button class="btn btn-secondary" onclick="scanForLink()">📷</button>
-                            <button class="btn btn-primary" onclick="saveLinkedBarcode()">💾</button>
-                        </div>
-                    </div>
-                    <div class="card" id="photoPanel" style="display:none">
-                        <div class="section-title">📸 Product Foto</div>
-                        <div style="aspect-ratio:1;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:12px;border:2px dashed var(--border)" id="photoCaptureBox" onclick="startPhotoCapture()">
-                            <video id="photoVideo" style="display:none;width:100%;height:100%;object-fit:cover" autoplay playsinline></video>
-                            <img id="photoPreview" style="display:none;width:100%;height:100%;object-fit:cover">
-                            <div id="photoPlaceholder" style="text-align:center;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:8px">📸</div><div>Tik om foto te maken</div></div>
-                        </div>
-                        <div class="input-row" id="photoActions" style="display:none">
-                            <button class="btn btn-secondary" onclick="retakePhoto()" style="flex:1">🔄 Opnieuw</button>
-                            <button class="btn btn-primary" onclick="savePhoto()" style="flex:1">💾 Opslaan</button>
-                        </div>
-                    </div>
-                    <div class="card" id="qrPanel" style="display:none">
-                        <div class="section-title">🏷️ QR Code</div>
-                        <div style="display:flex;gap:16px;align-items:flex-start">
-                            <div id="qrPreviewBox" style="width:120px;height:120px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                <canvas id="qrPreviewCanvas" style="width:100px;height:100px"></canvas>
-                            </div>
-                            <div style="flex:1">
-                                <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Huidige code:</div>
-                                <div id="qrCurrentCode" style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;margin-bottom:12px">-</div>
-                                <div style="font-size:11px;color:var(--text-muted)">
-                                    <div id="qrHasDMCode" style="display:none;color:var(--success)">✓ DM code toegewezen</div>
-                                    <div id="qrNoDMCode" style="display:none;color:var(--warning)">⚠ Geen DM code</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-                            <button class="btn btn-secondary" onclick="generateProductQR()" id="qrGenerateBtn" style="flex:1;min-width:100px">🔄 Genereer DM Code</button>
-                            <button class="btn btn-success" onclick="printProductQR()" id="qrPrintBtn" style="flex:1;min-width:100px">🖨️ Print</button>
-                        </div>
                     </div>
                     
                     <!-- Extra ruimte voor mobiel scrollen -->
@@ -991,7 +957,7 @@ function handleScanSuccess(decodedText,format){
     });
     
     if(matchingScans.length>=STABILITY_COUNT){
-        // Stable scan! Stop scanning and show confirmation
+        // Stable scan! Go directly to product
         debugLog('Stabiele code gevonden!',{code:searchCode,format:format,gs1:gs1Data});
         
         if(navigator.vibrate)navigator.vibrate([100,50,100]);
@@ -1001,28 +967,10 @@ function handleScanSuccess(decodedText,format){
         pendingGS1=gs1Data;
         recentScans=[];
         
-        // Pause scanner
-        if(html5QrCode&&html5QrCode.isScanning){
-            html5QrCode.pause(true);
-            debugLog('Scanner gepauzeerd voor bevestiging');
-        }
-        
-        // Toon scan resultaat
-        document.getElementById('scannedBarcodeValue').textContent=displayCode;
-        
-        // Toon GS1 details als beschikbaar
-        let formatText='Type: '+format;
-        if(gs1Data){
-            formatText='GS1 DataMatrix';
-            if(gs1Data.gtin)formatText+=` • GTIN: ${gs1Data.gtin}`;
-            if(gs1Data.batch)formatText+=` • Batch: ${gs1Data.batch}`;
-            if(gs1Data.serial)formatText+=` • SN: ${gs1Data.serial}`;
-        }
-        document.getElementById('scannedBarcodeFormat').textContent=formatText;
-        
-        document.getElementById('barcodeConfirm').style.display='block';
-        document.getElementById('scanStatus').textContent='Code gevonden!';
-        document.getElementById('scanStatus').className='scan-status found';
+        // Stop scanner and go directly to lookup
+        stopScanner();
+        document.getElementById('barcodeInput').value=searchCode;
+        lookupBarcode();
     }
 }
 
@@ -1380,7 +1328,8 @@ function selectProduct(p){
     document.getElementById('productFavoriteBtn').textContent=favorites.includes(p.id)?'⭐':'☆';
     document.getElementById('editMinStock').value=p.minStock||'';
     document.getElementById('editIdealStock').value=p.idealStock||'';
-    document.getElementById('currentBarcode').textContent=p.barcode||'Geen';
+    document.getElementById('currentStockDisplay').textContent=p.stock||0;
+    document.getElementById('stockCorrectionValue').value='';
     const sel=document.getElementById('projectSelect');
     if(lastProjectId&&(Date.now()-lastProjectTime)<PROJECT_TIMEOUT)sel.value=lastProjectId;else sel.value='';
     hideAllPanels();showScreen('product');
@@ -1464,16 +1413,11 @@ async function registerAction(action){
 }
 
 // === PANELS ===
-function hideAllPanels(){['editPanel','linkPanel','photoPanel','qrPanel'].forEach(id=>document.getElementById(id).style.display='none');stopPhotoStream();}
+function hideAllPanels(){['editPanel'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 function showPanel(p){
     hideAllPanels();
-    if(p==='edit'&&currentProduct){
-        document.getElementById('currentStockValue').textContent=currentProduct.stock||0;
-    }
-    if(p==='qr'&&currentProduct){
-        updateQRPanel();
-    }
-    document.getElementById(p+'Panel').style.display='block';
+    const panel=document.getElementById(p+'Panel');
+    if(panel)panel.style.display='block';
 }
 
 function updateQRPanel(){
@@ -1677,6 +1621,67 @@ async function saveStockCorrection(){
         showToast(`Stock aangepast: ${currentStock} → ${val} (${difference>0?'+':''}${difference})`);
     }catch(e){
         console.error(e);
+        showToast('Fout bij opslaan','error');
+    }
+    showLoading(false);
+}
+
+async function doStockCorrection(){
+    const val=parseInt(document.getElementById('stockCorrectionValue').value);
+    if(isNaN(val)){showToast('Ongeldige waarde','error');return;}
+    
+    const currentStock=currentProduct.stock||0;
+    const difference=val-currentStock;
+    
+    if(difference===0){showToast('Geen wijziging','error');return;}
+    
+    showLoading(true);
+    try{
+        // Create a registration for the stock correction in Notion
+        const corrResult = await notionRequest('/pages','POST',{
+            parent:{database_id:REGISTRATIONS_DB},
+            properties:{
+                'Omschrijving':{title:[{text:{content:`${currentProduct.name} - Stock correctie`}}]},
+                'Actie':{select:{name:'Stock correctie'}},
+                'Aantal':{number:difference},
+                'Medewerker':{rich_text:[{text:{content:userName}}]},
+                'Eenheidsprijs':{number:currentProduct.price||0},
+                'Datum':{date:{start:new Date().toISOString().split('T')[0]}},
+                'Barcode':{rich_text:[{text:{content:currentProduct.barcode||''}}]},
+                'Stock Artikel':{relation:[{id:currentProduct.id}]}
+            }
+        });
+        
+        debugLog('Stock correctie opgeslagen',{pageId:corrResult?.id,oud:currentStock,nieuw:val,verschil:difference});
+        
+        // Update local state
+        currentProduct.stock=val;
+        const idx=products.findIndex(x=>x.id===currentProduct.id);
+        if(idx>=0)products[idx].stock=val;
+        
+        // Update displays
+        document.getElementById('productStock').textContent=val;
+        document.getElementById('currentStockDisplay').textContent=val;
+        document.getElementById('stockCorrectionValue').value='';
+        
+        addToScanLog({
+            notionPageId:corrResult?.id,
+            productId:currentProduct.id,
+            productName:currentProduct.name,
+            projectId:'',
+            projectName:'Stock correctie',
+            projectNumber:0,
+            action:'Stock correctie',
+            quantity:difference,
+            price:currentProduct.price||0,
+            margin:currentProduct.margin||0.2,
+            user:userName
+        });
+        
+        showToast(`Stock: ${currentStock} → ${val} (${difference>0?'+':''}${difference})`);
+    }catch(e){
+        console.error(e);
+        debugLog('Stock correctie fout',e.message);
         showToast('Fout bij opslaan','error');
     }
     showLoading(false);
