@@ -8,9 +8,10 @@
     <meta name="theme-color" content="#0f0f1a">
     <title>DM Stock Scanner</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@zxing/browser@latest"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
-        :root{--bg:#0f0f1a;--card:#1a1a2e;--border:#2d2d4a;--accent:#e94560;--accent-glow:rgba(233,69,96,0.15);--success:#4ade80;--success-glow:rgba(74,222,128,0.15);--warning:#fbbf24;--text:#eaeaea;--text-muted:#8892b0;--text-dim:#5a6078}
+        :root{--bg:#0f0f1a;--card:#1a1a2e;--border:#2d2d4a;--accent:#e94560;--accent-glow:rgba(233,69,96,0.15);--success:#4ade80;--success-glow:rgba(74,222,128,0.15);--warning:#fbbf24;--danger:#ef4444;--text:#eaeaea;--text-muted:#8892b0;--text-dim:#5a6078}
         *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
         html,body{height:100%;overflow:hidden}
         body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
@@ -246,6 +247,7 @@
                 <div class="modal-title">Meer acties</div>
                 <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('edit')"><span class="more-action-icon">✏️</span>Bewerken</button>
                 <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('link')"><span class="more-action-icon">🔗</span>Barcode koppelen</button>
+                <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('qr')"><span class="more-action-icon">🏷️</span>QR code</button>
                 <button class="more-action-btn" onclick="closeModal('actionsModal');showPanel('photo')"><span class="more-action-icon">📸</span>Foto toevoegen</button>
                 <button class="more-action-btn" onclick="closeModal('actionsModal');openOrderModal()"><span class="more-action-icon">📧</span>Bijbestellen</button>
                 <div class="modal-buttons"><button class="btn btn-secondary" onclick="closeModal('actionsModal')">Sluiten</button></div>
@@ -423,6 +425,26 @@
                             <button class="btn btn-primary" onclick="savePhoto()" style="flex:1">💾 Opslaan</button>
                         </div>
                     </div>
+                    <div class="card" id="qrPanel" style="display:none">
+                        <div class="section-title">🏷️ QR Code</div>
+                        <div style="display:flex;gap:16px;align-items:flex-start">
+                            <div id="qrPreviewBox" style="width:120px;height:120px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <canvas id="qrPreviewCanvas" style="width:100px;height:100px"></canvas>
+                            </div>
+                            <div style="flex:1">
+                                <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Huidige code:</div>
+                                <div id="qrCurrentCode" style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;margin-bottom:12px">-</div>
+                                <div style="font-size:11px;color:var(--text-muted)">
+                                    <div id="qrHasDMCode" style="display:none;color:var(--success)">✓ DM code toegewezen</div>
+                                    <div id="qrNoDMCode" style="display:none;color:var(--warning)">⚠ Geen DM code</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+                            <button class="btn btn-secondary" onclick="generateProductQR()" id="qrGenerateBtn" style="flex:1;min-width:100px">🔄 Genereer DM Code</button>
+                            <button class="btn btn-success" onclick="printProductQR()" id="qrPrintBtn" style="flex:1;min-width:100px">🖨️ Print</button>
+                        </div>
+                    </div>
                     
                     <!-- Extra ruimte voor mobiel scrollen -->
                     <div style="height:120px"></div>
@@ -444,6 +466,18 @@
                         <div class="section-title">👤 Gebruiker</div>
                         <select class="select-field" id="userSelect" onchange="changeUser(this.value)" style="margin-bottom:12px"></select>
                         <div class="input-row"><input type="text" class="input-field" id="newUserInput" placeholder="Nieuwe gebruiker..."><button class="btn btn-primary" onclick="addUser()">+</button></div>
+                    </div>
+                    <div class="card">
+                        <div class="section-title">🖨️ Bluetooth Printer (Niimbot B3S)</div>
+                        <div id="printerStatus" style="padding:12px;background:var(--bg);border-radius:10px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+                            <span id="printerStatusIcon" style="font-size:20px">⚪</span>
+                            <div style="flex:1">
+                                <div id="printerStatusText" style="font-size:14px;font-weight:500">Niet verbonden</div>
+                                <div id="printerStatusSub" style="font-size:11px;color:var(--text-muted)">Klik om te verbinden</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary btn-full" onclick="connectBluetoothPrinter()" id="printerConnectBtn" style="margin-bottom:8px">🔗 Verbind Printer</button>
+                        <button class="btn btn-secondary btn-full" onclick="testPrintLabel()" id="printerTestBtn" style="display:none">🧪 Test Print</button>
                     </div>
                     <div class="card">
                         <div class="section-title">➕ Nieuw Artikel</div>
@@ -515,16 +549,16 @@
                                 <input type="radio" name="labelFormat" value="small" style="display:none">
                                 <span style="font-size:24px;margin-bottom:6px">▬</span>
                                 <span style="font-size:12px;font-weight:600">Klein</span>
-                                <span style="font-size:10px;color:var(--text-muted)">32x25mm</span>
+                                <span style="font-size:10px;color:var(--text-muted)">40x30mm</span>
                             </label>
                             <label class="label-format-option" onclick="selectLabelFormat('medium')" style="display:flex;flex-direction:column;align-items:center;padding:16px 8px;background:var(--bg);border-radius:10px;cursor:pointer;border:2px solid var(--border)" id="labelFormatMedium">
                                 <input type="radio" name="labelFormat" value="medium" style="display:none">
                                 <span style="font-size:24px;margin-bottom:6px">▭</span>
                                 <span style="font-size:12px;font-weight:600">Medium</span>
-                                <span style="font-size:10px;color:var(--text-muted)">51x25mm</span>
+                                <span style="font-size:10px;color:var(--text-muted)">50x30mm</span>
                             </label>
                         </div>
-                        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">💡 Zebra ZD421 compatibel</p>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">💡 Niimbot B3S compatibel</p>
                         <div style="margin-top:12px">
                             <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
                                 <input type="checkbox" id="qrSaveToNotion" checked style="width:20px;height:20px">
@@ -533,7 +567,11 @@
                         </div>
                     </div>
                     
-                    <button class="btn btn-primary btn-full" onclick="generateQRLabels()">🖨️ Labels Genereren & Printen</button>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button class="btn btn-primary" onclick="generateQRLabels()" style="flex:1;min-width:140px">📄 PDF Genereren</button>
+                        <button class="btn btn-success" onclick="printToNiimbot()" id="niimbotPrintBtn" style="flex:1;min-width:140px">🖨️ Print Niimbot</button>
+                    </div>
+                    <p id="niimbotPrintStatus" style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px"></p>
                     
                     <!-- Extra ruimte voor mobiel scrollen -->
                     <div style="height:120px"></div>
@@ -623,8 +661,12 @@ async function testApiKey(key,isSetup){
     showLoading(true);
     debugLog('API key testen...',{keyPrefix:key.substring(0,10)+'...',isSetup});
     try{
-        const url=`https://corsproxy.io/?${encodeURIComponent('https://api.notion.com/v1/databases/'+STOCK_DB)}`;
-        debugLog('Test URL',url);
+        // Gebruik eigen Vercel proxy in productie
+        const isLocalhost=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
+        const url=isLocalhost
+            ?`https://corsproxy.io/?${encodeURIComponent('https://api.notion.com/v1/databases/'+STOCK_DB)}`
+            :`/api/notion?path=${encodeURIComponent('/v1/databases/'+STOCK_DB)}`;
+        debugLog('Test URL',{url,proxy:isLocalhost?'corsproxy':'vercel'});
         const res=await fetch(url,{headers:{'Authorization':`Bearer ${key}`,'Notion-Version':'2022-06-28'}});
         debugLog('Test response',{status:res.status,ok:res.ok});
         if(!res.ok){
@@ -660,13 +702,25 @@ async function startApp(){
 
 // === API ===
 async function notionRequest(endpoint,method='GET',body=null){
-    const url=`https://api.notion.com/v1${endpoint}`;
-    const opts={method,headers:{'Authorization':`Bearer ${apiKey}`,'Notion-Version':'2022-06-28','Content-Type':'application/json'}};
+    // Gebruik eigen Vercel proxy in productie, corsproxy als fallback voor dev
+    const isLocalhost=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
+    const proxyUrl=isLocalhost
+        ?`https://corsproxy.io/?${encodeURIComponent('https://api.notion.com/v1'+endpoint)}`
+        :`/api/notion?path=${encodeURIComponent('/v1'+endpoint)}`;
+    
+    const opts={
+        method,
+        headers:{
+            'Authorization':`Bearer ${apiKey}`,
+            'Notion-Version':'2022-06-28',
+            'Content-Type':'application/json'
+        }
+    };
     if(body)opts.body=JSON.stringify(body);
     
-    debugLog(`API ${method} ${endpoint}`);
+    debugLog(`API ${method} ${endpoint}`,{proxy:isLocalhost?'corsproxy':'vercel'});
     
-    const res=await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`,opts);
+    const res=await fetch(proxyUrl,opts);
     
     if(!res.ok){
         const errorText=await res.text();
@@ -699,7 +753,7 @@ async function loadProducts(){
             if(cursor)body.start_cursor=cursor;
             debugLog(`Notion query pagina ${pageNum}`,{cursor:cursor||'start'});
             const res=await notionRequest(`/databases/${STOCK_DB}/query`,'POST',body);
-            const items=res.results.map(p=>({id:p.id,name:p.properties['OMSCHRIJVIN']?.title?.[0]?.plain_text||'',barcode:p.properties[' ID (barcode)']?.rich_text?.[0]?.plain_text||'',category:p.properties['HOOFDGROEP']?.select?.name||'',price:p.properties['AANKOOP PRIJS ']?.number||0,margin:p.properties['MARGE / VERWERKINGSTOESLAG']?.number||0.2,stock:p.properties['stock totaal']?.formula?.number??p.properties['STOCK (begin 2023) manual overrule']?.number??0,unit:p.properties['EENHEID']?.select?.name||'',minStock:p.properties['MINIMUM STOCK']?.number||0,idealStock:p.properties['IDEALE STOCK']?.number||0,supplier:p.properties['Leverancier']?.select?.name||'',imageUrl:p.properties['Afbeelding']?.files?.[0]?.external?.url||p.properties['Afbeelding']?.files?.[0]?.file?.url||''}));
+            const items=res.results.map(p=>({id:p.id,name:p.properties['OMSCHRIJVIN']?.title?.[0]?.plain_text||'',barcode:p.properties[' ID (barcode)']?.rich_text?.[0]?.plain_text||'',supplierCode:p.properties[' ARTIKEL CODE LEVERANCIER']?.rich_text?.[0]?.plain_text||'',category:p.properties['HOOFDGROEP']?.select?.name||'',price:p.properties['AANKOOP PRIJS ']?.number||0,margin:p.properties['MARGE / VERWERKINGSTOESLAG']?.number||0.2,stock:p.properties['stock totaal']?.formula?.number??p.properties['STOCK (begin 2023) manual overrule']?.number??0,unit:p.properties['EENHEID']?.select?.name||'',minStock:p.properties['MINIMUM STOCK']?.number||0,idealStock:p.properties['IDEALE STOCK']?.number||0,supplier:p.properties['Leverancier']?.select?.name||'',imageUrl:p.properties['Afbeelding']?.files?.[0]?.external?.url||p.properties['Afbeelding']?.files?.[0]?.file?.url||''}));
             debugLog(`Pagina ${pageNum} resultaat`,{items:items.length,hasMore:res.has_more});
             all=[...all,...items];hasMore=res.has_more;cursor=res.next_cursor;
         }
@@ -748,6 +802,11 @@ function showScreen(screen){
     const titles={home:'Stock Scanner',scan:'Scannen',articles:'Artikelen',product:'Artikel',log:'Scan Log',more:'Instellingen',newArticle:'Nieuw Artikel',qrlabels:'QR Labels'};
     document.getElementById('headerTitle').textContent=titles[screen]||'Stock Scanner';
     document.getElementById('backBtn').classList.toggle('visible',['product','newArticle','qrlabels'].includes(screen));
+    
+    // Auto-start scanner when entering scan screen
+    if(screen==='scan'){
+        setTimeout(()=>startScanner(),300);
+    }
 }
 
 function goBack(){screenHistory.pop();showScreen(screenHistory[screenHistory.length-1]||'home');}
@@ -797,119 +856,133 @@ function toggleDebug(){
     if(debugMode)debugLog('Debug modus ingeschakeld');
 }
 
-// ZXing Scanner
-let codeReader=null;
-let scannerControls=null;
+// Html5Qrcode Scanner
+let html5QrCode=null;
+let scannerStarting=false;
 
 async function startScanner(){
-    if(scannerControls){
-        debugLog('Scanner al actief, stoppen eerst');
-        await stopScanner();
+    if(scannerStarting){
+        debugLog('Scanner al aan het starten, wachten...');
+        return;
     }
     
+    if(html5QrCode&&html5QrCode.isScanning){
+        debugLog('Scanner al actief');
+        return;
+    }
+    
+    scannerStarting=true;
     document.getElementById('scannerPlaceholder').style.display='none';
     document.getElementById('scanStatus').textContent='Camera starten...';
     document.getElementById('barcodeConfirm').style.display='none';
     recentScans=[];
     
-    debugLog('ZXing scanner starten...');
+    debugLog('Html5Qrcode scanner starten...');
     
     try{
-        // Create multi-format reader with hints for better recognition
-        const hints=new Map();
-        hints.set(2,true); // TRY_HARDER
-        hints.set(3,true); // PURE_BARCODE (assume barcode only, no text around it)
-        
-        codeReader=new ZXingBrowser.BrowserMultiFormatReader(hints);
-        
-        // Get available cameras
-        const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-        debugLog('Beschikbare cameras',devices.map(d=>({id:d.deviceId,label:d.label})));
-        
-        if(!devices||devices.length===0){
-            throw new Error('Geen camera gevonden');
+        // Check if library is available
+        if(typeof Html5Qrcode==='undefined'){
+            throw new Error('Html5Qrcode library niet geladen');
         }
         
-        // Prefer back camera
-        let selectedDeviceId=devices[0].deviceId;
-        const backCamera=devices.find(d=>
-            d.label.toLowerCase().includes('back')||
-            d.label.toLowerCase().includes('rear')||
-            d.label.toLowerCase().includes('environment')||
-            d.label.toLowerCase().includes('achter')
-        );
-        if(backCamera){
-            selectedDeviceId=backCamera.deviceId;
-            debugLog('Achtercamera geselecteerd',backCamera.label);
-        }else{
-            debugLog('Eerste camera gebruiken',devices[0].label);
+        // Create scanner instance
+        html5QrCode=new Html5Qrcode('scannerReader',{verbose:false});
+        
+        // Get cameras
+        let cameras=[];
+        try{
+            cameras=await Html5Qrcode.getCameras();
+            debugLog('Beschikbare cameras',cameras.length?cameras.map(c=>({id:c.id.slice(0,8),label:c.label})):'geen');
+        }catch(camErr){
+            debugLog('Camera lijst fout',camErr.message);
         }
         
-        // Create video element with better constraints
-        let videoElem=document.getElementById('scannerVideo');
-        if(!videoElem){
-            videoElem=document.createElement('video');
-            videoElem.id='scannerVideo';
-            videoElem.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:16px';
-            videoElem.setAttribute('playsinline','true');
-            videoElem.setAttribute('autoplay','true');
-            document.getElementById('scannerReader').appendChild(videoElem);
+        // Find back camera
+        let cameraId=null;
+        if(cameras.length>0){
+            const backCam=cameras.find(c=>
+                c.label&&(
+                    c.label.toLowerCase().includes('back')||
+                    c.label.toLowerCase().includes('rear')||
+                    c.label.toLowerCase().includes('environment')||
+                    c.label.toLowerCase().includes('achter')
+                )
+            );
+            cameraId=backCam?backCam.id:cameras[cameras.length-1].id; // Last camera usually back on mobile
+            debugLog('Camera geselecteerd',cameraId?cameraId.slice(0,8):'default');
         }
         
-        debugLog('Scanner starten met device',selectedDeviceId);
-        
-        // Video constraints for better quality
-        const constraints={
-            video:{
-                deviceId:selectedDeviceId?{exact:selectedDeviceId}:undefined,
-                facingMode:'environment',
-                width:{ideal:1280},
-                height:{ideal:720},
-                focusMode:'continuous'
-            }
+        const config={
+            fps:10,
+            qrbox:{width:250,height:150},
+            aspectRatio:1.333,
+            disableFlip:false,
+            formatsToSupport:[
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.DATA_MATRIX
+            ]
         };
         
-        // Start continuous scanning
-        scannerControls=await codeReader.decodeFromConstraints(
-            constraints,
-            videoElem,
-            (result,error,controls)=>{
-                if(result){
-                    onZXingScanSuccess(result);
-                }
-                // Errors are normal when no code found, ignore them
-            }
-        );
+        const onSuccess=(decodedText,decodedResult)=>{
+            handleScanSuccess(decodedText,decodedResult.result.format?.formatName||'UNKNOWN');
+        };
+        
+        const onError=(err)=>{
+            // Normal when no code in view, ignore
+        };
+        
+        // Start scanning
+        if(cameraId){
+            await html5QrCode.start(cameraId,config,onSuccess,onError);
+        }else{
+            await html5QrCode.start({facingMode:'environment'},config,onSuccess,onError);
+        }
         
         document.getElementById('scannerBox').classList.add('active');
         document.getElementById('scanStatus').textContent='Zoeken naar code...';
         document.getElementById('scanStatus').className='scan-status detecting';
-        debugLog('ZXing scanner actief');
+        debugLog('Html5Qrcode scanner actief');
         
     }catch(e){
         console.error('Scanner error:',e);
-        debugLog('Scanner error',e.message);
-        showToast('Camera niet beschikbaar: '+e.message,'error');
+        debugLog('Scanner error',e.message||e);
+        showToast('Camera fout: '+e.message,'error');
         document.getElementById('scannerPlaceholder').style.display='flex';
-        document.getElementById('scanStatus').textContent='Camera fout: '+e.message;
+        document.getElementById('scanStatus').textContent='Tik om opnieuw te proberen';
+    }finally{
+        scannerStarting=false;
     }
 }
 
-function onZXingScanSuccess(result){
-    const decodedText=result.getText();
-    const format=result.getBarcodeFormat();
+function handleScanSuccess(decodedText,format){
     const now=Date.now();
     
-    debugLog('Scan gedetecteerd',{code:decodedText,format:format});
+    // Parse GS1 DataMatrix als het een GS1 code is
+    const gs1Data=parseGS1(decodedText);
+    const displayCode=gs1Data?gs1Data.displayCode:decodedText;
+    const searchCode=gs1Data?gs1Data.searchCode:decodedText;
     
-    // Add to recent scans
-    recentScans.push({code:decodedText,format:format,time:now});
+    debugLog('Scan gedetecteerd',{
+        raw:decodedText,
+        format:format,
+        isGS1:!!gs1Data,
+        gs1:gs1Data
+    });
+    
+    // Add to recent scans (use searchCode for stability)
+    recentScans.push({code:searchCode,format:format,time:now,raw:decodedText,gs1:gs1Data});
     
     // Remove old scans outside window
     recentScans=recentScans.filter(s=>now-s.time<STABILITY_WINDOW);
     
     // Check for stability (same code scanned multiple times)
-    const matchingScans=recentScans.filter(s=>s.code===decodedText);
+    const matchingScans=recentScans.filter(s=>s.code===searchCode);
     
     debugLog('Stabiliteit check',{
         recentScans:recentScans.length,
@@ -919,39 +992,229 @@ function onZXingScanSuccess(result){
     
     if(matchingScans.length>=STABILITY_COUNT){
         // Stable scan! Stop scanning and show confirmation
-        debugLog('Stabiele code gevonden!',{code:decodedText,format:format});
+        debugLog('Stabiele code gevonden!',{code:searchCode,format:format,gs1:gs1Data});
         
         if(navigator.vibrate)navigator.vibrate([100,50,100]);
         
-        pendingCode=decodedText;
-        pendingFormat=format.toString();
+        pendingCode=searchCode;
+        pendingFormat=format;
+        pendingGS1=gs1Data;
         recentScans=[];
         
         // Pause scanner
-        if(scannerControls){
-            scannerControls.stop();
-            debugLog('Scanner gestopt voor bevestiging');
+        if(html5QrCode&&html5QrCode.isScanning){
+            html5QrCode.pause(true);
+            debugLog('Scanner gepauzeerd voor bevestiging');
         }
         
-        document.getElementById('scannedBarcodeValue').textContent=decodedText;
-        document.getElementById('scannedBarcodeFormat').textContent='Type: '+format.toString();
+        // Toon scan resultaat
+        document.getElementById('scannedBarcodeValue').textContent=displayCode;
+        
+        // Toon GS1 details als beschikbaar
+        let formatText='Type: '+format;
+        if(gs1Data){
+            formatText='GS1 DataMatrix';
+            if(gs1Data.gtin)formatText+=` • GTIN: ${gs1Data.gtin}`;
+            if(gs1Data.batch)formatText+=` • Batch: ${gs1Data.batch}`;
+            if(gs1Data.serial)formatText+=` • SN: ${gs1Data.serial}`;
+        }
+        document.getElementById('scannedBarcodeFormat').textContent=formatText;
+        
         document.getElementById('barcodeConfirm').style.display='block';
         document.getElementById('scanStatus').textContent='Code gevonden!';
         document.getElementById('scanStatus').className='scan-status found';
     }
 }
 
+// GS1 DataMatrix Parser
+// Parset Application Identifiers uit GS1 codes
+let pendingGS1=null;
+
+function parseGS1(data){
+    if(!data)return null;
+    
+    // GS1 DataMatrix begint vaak met ]d2 of ]C1 (symbology identifier)
+    // Of bevat GS (Group Separator, ASCII 29) karakters
+    let cleanData=data;
+    let isGS1=false;
+    
+    // Verwijder symbology identifier
+    if(cleanData.startsWith(']d2')||cleanData.startsWith(']C1')||cleanData.startsWith(']e0')){
+        cleanData=cleanData.substring(3);
+        isGS1=true;
+    }
+    
+    // Check voor FNC1 in eerste positie (GS1 indicator)
+    const GS=String.fromCharCode(29); // Group Separator
+    if(cleanData.includes(GS)){
+        isGS1=true;
+    }
+    
+    // Als het begint met 01, 02, 10, 21, 17 etc is het waarschijnlijk GS1
+    if(/^(01|02|10|11|17|21|30|37)\d/.test(cleanData)){
+        isGS1=true;
+    }
+    
+    if(!isGS1)return null;
+    
+    // Parse Application Identifiers
+    const result={
+        raw:data,
+        gtin:null,
+        batch:null,
+        serial:null,
+        expiry:null,
+        prodDate:null,
+        count:null,
+        other:{}
+    };
+    
+    // AI definities: {length: fixed length of null voor variabel, maxLength: max voor variabel}
+    const aiDefs={
+        '00':{len:18,name:'SSCC'},
+        '01':{len:14,name:'GTIN'},
+        '02':{len:14,name:'GTIN Content'},
+        '10':{len:null,max:20,name:'Batch/Lot'},
+        '11':{len:6,name:'Prod Date'},
+        '13':{len:6,name:'Pack Date'},
+        '15':{len:6,name:'Best Before'},
+        '17':{len:6,name:'Expiry Date'},
+        '21':{len:null,max:20,name:'Serial'},
+        '30':{len:null,max:8,name:'Var Count'},
+        '37':{len:null,max:8,name:'Count'},
+        '310':{len:6,name:'Net Weight kg'},
+        '320':{len:6,name:'Net Weight lb'},
+        '91':{len:null,max:90,name:'Internal'},
+        '92':{len:null,max:90,name:'Internal'},
+        '93':{len:null,max:90,name:'Internal'}
+    };
+    
+    let pos=0;
+    let iterations=0;
+    const maxIterations=20;
+    
+    while(pos<cleanData.length&&iterations<maxIterations){
+        iterations++;
+        
+        // Sla GS karakters over
+        if(cleanData[pos]===GS){
+            pos++;
+            continue;
+        }
+        
+        // Probeer AI te matchen (2, 3 of 4 cijfers)
+        let ai=null;
+        let aiDef=null;
+        
+        for(const aiLen of [4,3,2]){
+            const testAI=cleanData.substring(pos,pos+aiLen);
+            // Check exacte match of prefix match voor variabele AI's
+            if(aiDefs[testAI]){
+                ai=testAI;
+                aiDef=aiDefs[testAI];
+                break;
+            }
+            // Check voor AI's met variabele laatste cijfer (bijv 310x)
+            if(aiLen>=3&&aiDefs[testAI.substring(0,3)]){
+                ai=testAI;
+                aiDef=aiDefs[testAI.substring(0,3)];
+                break;
+            }
+        }
+        
+        if(!ai){
+            // Geen bekende AI, stop parsing
+            debugLog('GS1 parse stop: onbekende AI op positie '+pos,cleanData.substring(pos,pos+10));
+            break;
+        }
+        
+        pos+=ai.length;
+        
+        // Haal waarde op
+        let value='';
+        if(aiDef.len){
+            // Fixed length
+            value=cleanData.substring(pos,pos+aiDef.len);
+            pos+=aiDef.len;
+        }else{
+            // Variable length - tot GS of einde
+            const gsPos=cleanData.indexOf(GS,pos);
+            if(gsPos>=0&&gsPos<pos+(aiDef.max||20)){
+                value=cleanData.substring(pos,gsPos);
+                pos=gsPos+1;
+            }else{
+                // Tot max lengte of einde string
+                const maxLen=aiDef.max||20;
+                value=cleanData.substring(pos,pos+maxLen);
+                // Zoek naar begin van volgende AI (2 cijfers gevolgd door meer)
+                for(let i=1;i<value.length-1;i++){
+                    const testAI=value.substring(i,i+2);
+                    if(aiDefs[testAI]||aiDefs[value.substring(i,i+3)]||aiDefs[value.substring(i,i+4)]){
+                        value=value.substring(0,i);
+                        break;
+                    }
+                }
+                pos+=value.length;
+            }
+        }
+        
+        // Sla waarde op
+        debugLog('GS1 AI geparsed',{ai,name:aiDef.name,value});
+        
+        switch(ai){
+            case '01':
+            case '02':
+                result.gtin=value;
+                break;
+            case '10':
+                result.batch=value;
+                break;
+            case '21':
+                result.serial=value;
+                break;
+            case '17':
+            case '15':
+                result.expiry=value;
+                break;
+            case '11':
+            case '13':
+                result.prodDate=value;
+                break;
+            case '30':
+            case '37':
+                result.count=value;
+                break;
+            default:
+                result.other[ai]=value;
+        }
+    }
+    
+    // Maak display en search codes
+    // SearchCode: gebruik GTIN of Serial voor lookup
+    result.searchCode=result.gtin||result.serial||result.batch||cleanData;
+    
+    // DisplayCode: kort leesbaar formaat
+    let display=[];
+    if(result.gtin)display.push(result.gtin);
+    if(result.batch)display.push('Batch:'+result.batch);
+    if(result.serial)display.push('SN:'+result.serial);
+    result.displayCode=display.length?display.join(' '):cleanData;
+    
+    return result;
+}
+
 async function stopScanner(){
     debugLog('Scanner stoppen...');
-    if(scannerControls){
+    if(html5QrCode){
         try{
-            scannerControls.stop();
+            if(html5QrCode.isScanning){
+                await html5QrCode.stop();
+            }
         }catch(e){
             debugLog('Stop error (negeren)',e.message);
         }
-        scannerControls=null;
+        html5QrCode=null;
     }
-    codeReader=null;
     document.getElementById('scannerReader').innerHTML='';
     document.getElementById('scannerBox').classList.remove('active');
     document.getElementById('scannerPlaceholder').style.display='flex';
@@ -961,6 +1224,7 @@ async function stopScanner(){
     document.getElementById('ocrResults').innerHTML='';
     pendingCode='';
     pendingFormat='';
+    pendingGS1=null;
     recentScans=[];
 }
 
@@ -968,13 +1232,24 @@ async function rejectScan(){
     debugLog('Scan verworpen, opnieuw starten');
     pendingCode='';
     pendingFormat='';
+    pendingGS1=null;
     recentScans=[];
     document.getElementById('barcodeConfirm').style.display='none';
     document.getElementById('scanStatus').textContent='Zoeken naar code...';
     document.getElementById('scanStatus').className='scan-status detecting';
     
-    // Restart ZXing scanner
-    await startScanner();
+    // Resume Html5Qrcode scanner
+    if(html5QrCode&&!html5QrCode.isScanning){
+        try{
+            await html5QrCode.resume();
+        }catch(e){
+            // If resume fails, restart completely
+            await stopScanner();
+            await startScanner();
+        }
+    }else{
+        await startScanner();
+    }
 }
 
 async function acceptScan(){
@@ -989,20 +1264,48 @@ function lookupBarcode(){
     var input=document.getElementById('barcodeInput').value.trim();
     if(!input){showToast('Voer code in','error');return;}
     
-    debugLog('Zoeken naar product',{input:input});
+    debugLog('Zoeken naar product',{input:input,hasGS1:!!pendingGS1});
     
     var norm=function(b){return(b||'').trim().toUpperCase();};
     var search=norm(input);
-    var found=products.find(function(p){return norm(p.barcode)===search;});
+    var found=null;
     
-    debugLog('Exacte barcode match',{found:found?found.name:'geen'});
+    // Als we GS1 data hebben, zoek eerst op GTIN
+    if(pendingGS1&&pendingGS1.gtin){
+        const gtin=pendingGS1.gtin;
+        debugLog('Zoeken op GTIN',{gtin:gtin});
+        
+        // GTIN-14 kan voorloopnullen hebben, probeer verschillende variaties
+        const gtinVariants=[
+            gtin,
+            gtin.replace(/^0+/,''), // Zonder voorloopnullen
+            '0'+gtin.replace(/^0+/,''), // Met 1 voorloopnul
+            gtin.substring(1), // GTIN-13 uit GTIN-14
+            gtin.substring(0,13) // Eerste 13 cijfers
+        ];
+        
+        found=products.find(function(p){
+            const pb=norm(p.barcode);
+            return gtinVariants.some(g=>pb===norm(g)||pb.includes(norm(g)));
+        });
+        
+        debugLog('GTIN match',{found:found?found.name:'geen'});
+    }
     
+    // Zoek op exacte barcode
+    if(!found){
+        found=products.find(function(p){return norm(p.barcode)===search;});
+        debugLog('Exacte barcode match',{found:found?found.name:'geen'});
+    }
+    
+    // Zoek op gedeeltelijke barcode
     if(!found){
         var ws='/'+search.replace(/^\//,''),wos=search.replace(/^\//,'');
-        found=products.find(function(p){var pb=norm(p.barcode);return pb===ws||pb===wos||pb.includes(search);});
+        found=products.find(function(p){var pb=norm(p.barcode);return pb===ws||pb===wos||pb.includes(search)||search.includes(pb);});
         debugLog('Gedeeltelijke barcode match',{found:found?found.name:'geen'});
     }
     
+    // Zoek op naam
     if(!found){
         var searchLower=input.toLowerCase();
         found=products.find(function(p){return p.name&&p.name.toLowerCase()===searchLower;});
@@ -1029,11 +1332,16 @@ function lookupBarcode(){
         debugLog('Product gevonden',{id:found.id,name:found.name,barcode:found.barcode});
         document.getElementById('barcodeInput').value='';
         document.getElementById('ocrResults').innerHTML='';
+        pendingGS1=null; // Reset GS1 data
         selectProduct(found);
     }else{
         debugLog('Geen product gevonden, toon link modal');
-        linkingBarcode=input;
-        document.getElementById('linkModalBarcode').textContent=input;
+        // Gebruik GTIN als beschikbaar voor linken
+        linkingBarcode=pendingGS1?.gtin||input;
+        document.getElementById('linkModalBarcode').textContent=pendingGS1?
+            `GS1: ${pendingGS1.gtin}${pendingGS1.batch?' (Batch: '+pendingGS1.batch+')':''}`:
+            input;
+        pendingGS1=null;
         openModal('linkModal');
     }
 }
@@ -1132,7 +1440,19 @@ async function registerAction(action){
         localStorage.setItem('last_project_id',projectId);
         localStorage.setItem('last_project_time',lastProjectTime.toString());
         addToHistory({name:currentProduct.name,action,amount:qty,project:proj?.name||''});
-        addToScanLog({productId:currentProduct.id,productName:currentProduct.name,projectId,projectName:proj?.name||'',projectNumber:proj?.number||0,action,quantity:qty,price:currentProduct.price||0,margin:currentProduct.margin||0.2});
+        addToScanLog({
+            notionPageId:result?.id,
+            productId:currentProduct.id,
+            productName:currentProduct.name,
+            projectId,
+            projectName:proj?.name||'',
+            projectNumber:proj?.number||0,
+            action,
+            quantity:qty,
+            price:currentProduct.price||0,
+            margin:currentProduct.margin||0.2,
+            user:userName
+        });
         quantity=1;document.getElementById('quantityValue').textContent=1;
         showToast(`${Math.abs(qty)}x ${action==='Uitscannen'?'uit':'in'}`);
     }catch(e){
@@ -1144,13 +1464,159 @@ async function registerAction(action){
 }
 
 // === PANELS ===
-function hideAllPanels(){['editPanel','linkPanel','photoPanel'].forEach(id=>document.getElementById(id).style.display='none');stopPhotoStream();}
+function hideAllPanels(){['editPanel','linkPanel','photoPanel','qrPanel'].forEach(id=>document.getElementById(id).style.display='none');stopPhotoStream();}
 function showPanel(p){
     hideAllPanels();
     if(p==='edit'&&currentProduct){
         document.getElementById('currentStockValue').textContent=currentProduct.stock||0;
     }
+    if(p==='qr'&&currentProduct){
+        updateQRPanel();
+    }
     document.getElementById(p+'Panel').style.display='block';
+}
+
+function updateQRPanel(){
+    if(!currentProduct)return;
+    
+    const code=currentProduct.barcode||'';
+    const hasDMCode=code.startsWith('DM-');
+    
+    document.getElementById('qrCurrentCode').textContent=code||'Geen code';
+    document.getElementById('qrHasDMCode').style.display=hasDMCode?'block':'none';
+    document.getElementById('qrNoDMCode').style.display=hasDMCode?'none':'block';
+    document.getElementById('qrGenerateBtn').textContent=hasDMCode?'🔄 Nieuwe DM Code':'🔄 Genereer DM Code';
+    
+    // Render QR preview
+    const canvas=document.getElementById('qrPreviewCanvas');
+    if(code){
+        const qrCanvas=generateQRCanvas(code,100);
+        const ctx=canvas.getContext('2d');
+        canvas.width=100;
+        canvas.height=100;
+        ctx.drawImage(qrCanvas,0,0);
+    }else{
+        const ctx=canvas.getContext('2d');
+        canvas.width=100;
+        canvas.height=100;
+        ctx.fillStyle='#1a1a2e';
+        ctx.fillRect(0,0,100,100);
+        ctx.fillStyle='#5a6078';
+        ctx.font='12px Arial';
+        ctx.textAlign='center';
+        ctx.fillText('Geen code',50,55);
+    }
+}
+
+async function generateProductQR(){
+    if(!currentProduct)return;
+    
+    showLoading(true);
+    try{
+        // Get next DM code
+        const nextCode=await getNextDMCode();
+        const newCode='DM-'+String(nextCode).padStart(4,'0');
+        
+        // Save to Notion
+        debugLog('QR code genereren en opslaan',{id:currentProduct.id,code:newCode});
+        await notionRequest(`/pages/${currentProduct.id}`,'PATCH',{
+            properties:{' ID (barcode)':{rich_text:[{text:{content:newCode}}]}}
+        });
+        
+        // Update local
+        currentProduct.barcode=newCode;
+        const idx=products.findIndex(x=>x.id===currentProduct.id);
+        if(idx>=0)products[idx].barcode=newCode;
+        
+        // Update display
+        document.getElementById('productBarcode').textContent=newCode;
+        updateQRPanel();
+        
+        showToast(`QR code ${newCode} toegewezen`);
+        debugLog('QR code opgeslagen',{code:newCode});
+        
+    }catch(e){
+        console.error('QR generate error:',e);
+        debugLog('QR code genereren mislukt',e.message);
+        showToast('Fout bij opslaan','error');
+    }
+    showLoading(false);
+}
+
+async function printProductQR(){
+    if(!currentProduct)return;
+    
+    let code=currentProduct.barcode;
+    
+    // Generate code first if needed
+    if(!code){
+        await generateProductQR();
+        code=currentProduct.barcode;
+    }
+    
+    if(!code){
+        showToast('Geen QR code','error');
+        return;
+    }
+    
+    // Check if printer is connected
+    if(printerConnected){
+        // Print directly to Niimbot
+        showLoading(true);
+        try{
+            const canvas=await generateLabelCanvas(currentProduct);
+            const ctx=canvas.getContext('2d');
+            const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+            await printImageToNiimbot(imageData,canvas.width,canvas.height);
+            showToast('Label geprint!');
+        }catch(e){
+            console.error('Print error:',e);
+            showToast('Print mislukt','error');
+        }
+        showLoading(false);
+    }else{
+        // Open print window with single label
+        const cfg={w:'40mm',h:'30mm',qr:'25mm',nameSize:'8pt',codeSize:'7pt'};
+        const printWindow=window.open('','_blank');
+        printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>QR Label - ${esc(currentProduct.name)}</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        @page{size:auto;margin:5mm}
+        body{font-family:Arial,sans-serif;display:flex;justify-content:center;padding:10mm}
+        .label{width:${cfg.w};height:${cfg.h};border:1px dashed #ccc;padding:2mm;display:flex;align-items:center;background:#fff}
+        .qr{width:${cfg.qr};height:${cfg.qr};flex-shrink:0}
+        .qr canvas{width:100%!important;height:100%!important}
+        .info{flex:1;padding-left:2mm;overflow:hidden}
+        .name{font-size:${cfg.nameSize};font-weight:bold;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .code{font-size:${cfg.codeSize};font-family:monospace;color:#333}
+        @media print{.label{border:none}}
+    </style>
+</head>
+<body>
+    <div class="label">
+        <div class="qr" id="qr"></div>
+        <div class="info">
+            <div class="name">${esc(currentProduct.name.substring(0,30))}</div>
+            <div class="code">${esc(code)}</div>
+        </div>
+    </div>
+    <script>
+        QRCode.toCanvas(document.createElement('canvas'),'${code}',{width:200,margin:0},function(err,canvas){
+            if(!err)document.getElementById('qr').appendChild(canvas);
+        });
+        setTimeout(function(){window.print();},500);
+    <\/script>
+</body>
+</html>
+        `);
+        printWindow.document.close();
+    }
 }
 
 async function saveProductEdits(){
@@ -1174,7 +1640,7 @@ async function saveStockCorrection(){
     showLoading(true);
     try{
         // Create a registration for the stock correction
-        await notionRequest('/pages','POST',{
+        const corrResult = await notionRequest('/pages','POST',{
             parent:{database_id:REGISTRATIONS_DB},
             properties:{
                 'Omschrijving':{title:[{text:{content:`${currentProduct.name} - Stock correctie`}}]},
@@ -1195,6 +1661,7 @@ async function saveStockCorrection(){
         document.getElementById('editStockValue').value='';
         
         addToScanLog({
+            notionPageId:corrResult?.id,
             productId:currentProduct.id,
             productName:currentProduct.name,
             projectId:'',
@@ -1203,7 +1670,8 @@ async function saveStockCorrection(){
             action:'Stock correctie',
             quantity:difference,
             price:currentProduct.price||0,
-            margin:currentProduct.margin||0.2
+            margin:currentProduct.margin||0.2,
+            user:userName
         });
         
         showToast(`Stock aangepast: ${currentStock} → ${val} (${difference>0?'+':''}${difference})`);
@@ -1296,10 +1764,171 @@ function addToScanLog(item){scanLog.unshift({...item,time:new Date().toISOString
 
 function renderLog(){
     const list=document.getElementById('logList');
-    const byProj={};scanLog.forEach(e=>{if(!byProj[e.projectId])byProj[e.projectId]={id:e.projectId,name:e.projectName,number:e.projectNumber,items:[],totalCost:0,totalMargin:0};const m=marginOverrides[`${e.projectId}_${e.productId}`]??e.margin??0.2;const c=Math.abs(e.quantity)*(e.price||0);byProj[e.projectId].items.push({...e,margin:m,cost:c,withMargin:c*(1+m)});byProj[e.projectId].totalCost+=c;byProj[e.projectId].totalMargin+=c*(1+m);});
+    const byProj={};scanLog.forEach((e,idx)=>{
+        if(!byProj[e.projectId])byProj[e.projectId]={id:e.projectId,name:e.projectName,number:e.projectNumber,items:[],totalCost:0,totalMargin:0};
+        const m=marginOverrides[`${e.projectId}_${e.productId}`]??e.margin??0.2;
+        const c=Math.abs(e.quantity)*(e.price||0);
+        byProj[e.projectId].items.push({...e,margin:m,cost:c,withMargin:c*(1+m),logIndex:idx});
+        byProj[e.projectId].totalCost+=c;
+        byProj[e.projectId].totalMargin+=c*(1+m);
+    });
     const pList=Object.values(byProj).sort((a,b)=>b.number-a.number);
     if(!pList.length){list.innerHTML='<div class="empty-state"><div class="empty-state-icon">📊</div><div>Nog geen registraties</div></div>';return;}
-    list.innerHTML=pList.map((proj,idx)=>{const byProd={};proj.items.forEach(i=>{if(!byProd[i.productId])byProd[i.productId]={id:i.productId,name:i.productName,qty:0,price:i.price,margin:i.margin,projectId:i.projectId};byProd[i.productId].qty+=i.quantity;});const prodList=Object.values(byProd);return `<div class="log-card"><div class="log-header" onclick="toggleLog(${idx})"><div class="log-info"><div class="log-project">${proj.number} - ${esc(proj.name)}</div><div class="log-meta">${proj.items.length} registraties</div></div><div class="log-totals"><div class="log-total-cost">€${proj.totalCost.toFixed(2)}</div><div class="log-total-margin">€${proj.totalMargin.toFixed(2)}</div></div><div class="log-chevron" id="logChevron${idx}">▶</div></div><div class="log-details" id="logDetails${idx}">${prodList.map(p=>{const c=Math.abs(p.qty)*p.price,wm=c*(1+p.margin);return `<div class="log-item"><div class="log-item-name">${esc(p.name)}<br><span style="font-size:11px;color:var(--text-muted)">${Math.abs(p.qty)}× €${p.price.toFixed(2)}</span></div><div class="log-item-margin"><input type="number" value="${Math.round(p.margin*100)}" onchange="updateMargin('${p.projectId}_${p.id}',this.value)" onclick="event.stopPropagation()"><span style="font-size:11px;color:var(--text-muted)">%</span></div><div class="log-item-totals"><div class="log-item-cost">€${c.toFixed(2)}</div><div class="log-item-price">€${wm.toFixed(2)}</div></div></div>`;}).join('')}<button class="btn btn-secondary btn-full" onclick="syncMargins('${proj.id}')" style="margin-top:12px">☁️ Marges → Notion</button></div></div>`;}).join('');
+    
+    list.innerHTML=pList.map((proj,idx)=>{
+        // Group items by date then product
+        const itemsHtml=proj.items.map(i=>{
+            const date=new Date(i.time).toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit'});
+            const time=new Date(i.time).toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
+            const c=Math.abs(i.quantity)*(i.price||0);
+            const wm=c*(1+i.margin);
+            const syncIcon=i.notionPageId?'☁️':'💾';
+            const syncTitle=i.notionPageId?'Gesync met Notion':'Alleen lokaal opgeslagen';
+            const qtyColor=i.quantity<0?'var(--accent)':'var(--success)';
+            return `<div class="log-item" style="flex-wrap:wrap;gap:8px;padding:12px">
+                <div style="flex:1;min-width:120px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <span title="${syncTitle}" style="cursor:help;font-size:12px">${syncIcon}</span>
+                        <span style="font-weight:600;font-size:14px">${esc(i.productName)}</span>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${date} ${time} • ${i.user||'?'}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <div style="display:flex;align-items:center;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+                        <button onclick="event.stopPropagation();adjustLogQty(${i.logIndex},-1)" style="width:36px;height:36px;border:none;background:none;color:var(--accent);font-size:18px;font-weight:bold;cursor:pointer;border-radius:8px 0 0 8px">−</button>
+                        <input type="number" value="${i.quantity}" onchange="updateLogQty(${i.logIndex},this.value)" onclick="event.stopPropagation()" style="width:50px;text-align:center;padding:6px 2px;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);background:transparent;color:${qtyColor};font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace">
+                        <button onclick="event.stopPropagation();adjustLogQty(${i.logIndex},1)" style="width:36px;height:36px;border:none;background:none;color:var(--success);font-size:18px;font-weight:bold;cursor:pointer;border-radius:0 8px 8px 0">+</button>
+                    </div>
+                    <div style="text-align:right;min-width:60px">
+                        <div style="font-size:11px;color:var(--text-muted)">€${c.toFixed(2)}</div>
+                        <div style="font-size:13px;color:var(--success);font-weight:600">€${wm.toFixed(2)}</div>
+                    </div>
+                    <button onclick="event.stopPropagation();deleteLogItem(${i.logIndex})" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--danger);color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer" title="Verwijderen">🗑️</button>
+                </div>
+            </div>`;
+        }).join('');
+        
+        return `<div class="log-card">
+            <div class="log-header" onclick="toggleLog(${idx})">
+                <div class="log-info">
+                    <div class="log-project">${proj.number} - ${esc(proj.name)}</div>
+                    <div class="log-meta">${proj.items.length} registraties</div>
+                </div>
+                <div class="log-totals">
+                    <div class="log-total-cost">€${proj.totalCost.toFixed(2)}</div>
+                    <div class="log-total-margin">€${proj.totalMargin.toFixed(2)}</div>
+                </div>
+                <div class="log-chevron" id="logChevron${idx}">▶</div>
+            </div>
+            <div class="log-details" id="logDetails${idx}">
+                ${itemsHtml}
+                <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+                    <button class="btn btn-secondary" onclick="syncMargins('${proj.id}')" style="flex:1;min-width:120px;padding:12px">☁️ Sync Notion</button>
+                    <button class="btn" onclick="deleteProjectLog('${proj.id}')" style="background:var(--danger);color:#fff;flex:1;min-width:120px;padding:12px;border:none;border-radius:10px;font-weight:600;cursor:pointer">🗑️ Alles wissen</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function adjustLogQty(idx,delta){
+    const item=scanLog[idx];
+    const newQty=item.quantity+delta;
+    updateLogQty(idx,newQty);
+}
+
+async function updateLogQty(idx,val){
+    const newQty=parseInt(val)||0;
+    if(newQty===0){
+        deleteLogItem(idx);
+        return;
+    }
+    
+    const item=scanLog[idx];
+    const oldQty=item.quantity;
+    
+    // Update Notion if we have page ID
+    if(item.notionPageId){
+        showLoading(true);
+        try{
+            await notionRequest(`/pages/${item.notionPageId}`,'PATCH',{
+                properties:{
+                    'Aantal':{number:newQty}
+                }
+            });
+            debugLog('Notion registratie aangepast',{pageId:item.notionPageId,oldQty,newQty});
+        }catch(e){
+            console.error('Notion update fout:',e);
+            showToast('Notion sync mislukt','error');
+            showLoading(false);
+            return;
+        }
+        showLoading(false);
+    }
+    
+    // Update local
+    scanLog[idx].quantity=newQty;
+    localStorage.setItem('scan_log',JSON.stringify(scanLog));
+    renderLog();
+    showToast(`Aantal: ${oldQty} → ${newQty}`);
+}
+
+async function deleteLogItem(idx){
+    if(!confirm('Registratie verwijderen?\nDit verwijdert ook de Notion registratie.'))return;
+    
+    const item=scanLog[idx];
+    
+    // Archive in Notion if we have page ID
+    if(item.notionPageId){
+        showLoading(true);
+        try{
+            await notionRequest(`/pages/${item.notionPageId}`,'PATCH',{
+                archived:true
+            });
+            debugLog('Notion registratie gearchiveerd',{pageId:item.notionPageId});
+        }catch(e){
+            console.error('Notion delete fout:',e);
+            // Continue anyway - maybe page was already deleted
+        }
+        showLoading(false);
+    }
+    
+    // Update local
+    scanLog.splice(idx,1);
+    localStorage.setItem('scan_log',JSON.stringify(scanLog));
+    renderLog();
+    renderHistory();
+    showToast('Registratie verwijderd');
+}
+
+async function deleteProjectLog(projId){
+    const items=scanLog.filter(e=>e.projectId===projId);
+    const count=items.length;
+    const notionCount=items.filter(i=>i.notionPageId).length;
+    
+    if(!confirm(`Alle ${count} registraties voor dit project verwijderen?${notionCount>0?`\n\n${notionCount} Notion registraties worden gearchiveerd.`:''}`))return;
+    
+    // Archive in Notion
+    if(notionCount>0){
+        showLoading(true);
+        for(const item of items){
+            if(item.notionPageId){
+                try{
+                    await notionRequest(`/pages/${item.notionPageId}`,'PATCH',{archived:true});
+                }catch(e){
+                    console.error('Notion delete fout:',e);
+                }
+            }
+        }
+        showLoading(false);
+    }
+    
+    // Update local
+    scanLog=scanLog.filter(e=>e.projectId!==projId);
+    localStorage.setItem('scan_log',JSON.stringify(scanLog));
+    renderLog();
+    renderHistory();
+    showToast(`${count} registraties verwijderd`);
 }
 
 function toggleLog(idx){const d=document.getElementById('logDetails'+idx),c=document.getElementById('logChevron'+idx);const v=d.classList.toggle('visible');c.textContent=v?'▼':'▶';}
@@ -1345,7 +1974,9 @@ function filterQRProducts(){
     const noCodeOnly=document.getElementById('qrFilterNoCode')?.checked||false;
     qrFilteredProducts=products.filter(p=>{
         const matchesSearch=!q||p.name?.toLowerCase().includes(q)||p.barcode?.toLowerCase().includes(q);
-        const matchesNoCode=!noCodeOnly||!p.barcode||!p.barcode.startsWith('DM-');
+        // Filter op items zonder barcode als checkbox aangevinkt
+        const hasNoCode=!p.barcode||p.barcode.trim()==='';
+        const matchesNoCode=!noCodeOnly||hasNoCode;
         return matchesSearch&&matchesNoCode;
     });
     renderQRProductList();
@@ -1355,13 +1986,33 @@ function renderQRProductList(){
     const list=document.getElementById('qrProductList');
     if(!qrFilteredProducts.length)qrFilteredProducts=[...products];
     list.innerHTML=qrFilteredProducts.map(p=>{
-        const hasQR=p.barcode&&p.barcode.startsWith('DM-');
+        const hasBarcode=p.barcode&&p.barcode.trim()!=='';
+        const hasDMCode=hasBarcode&&p.barcode.startsWith('DM-');
+        let statusText, statusColor, statusIcon;
+        
+        if(hasDMCode){
+            statusText=p.barcode;
+            statusColor='var(--success)';
+            statusIcon='✓';
+        }else if(hasBarcode){
+            statusText=p.barcode;
+            statusColor='var(--warning)';
+            statusIcon='🔗';
+        }else{
+            statusText='Geen code - wordt gegenereerd';
+            statusColor='var(--accent)';
+            statusIcon='⚠️';
+        }
+        
         return `
         <div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleQRSelect('${p.id}')">
             <div style="width:24px;height:24px;border:2px solid ${qrSelectedProducts.has(p.id)?'var(--success)':'var(--border)'};border-radius:6px;margin-right:12px;display:flex;align-items:center;justify-content:center;background:${qrSelectedProducts.has(p.id)?'var(--success)':'transparent'};color:#000;font-size:14px">${qrSelectedProducts.has(p.id)?'✓':''}</div>
             <div style="flex:1;min-width:0">
                 <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
-                <div style="font-size:11px;color:${hasQR?'var(--success)':'var(--text-muted)'}">${hasQR?'✓ '+p.barcode:p.barcode||'Geen code'}</div>
+                <div style="font-size:11px;color:${statusColor};display:flex;align-items:center;gap:4px">
+                    <span>${statusIcon}</span>
+                    <span>${statusText}</span>
+                </div>
             </div>
         </div>
     `;}).join('');
@@ -1385,7 +2036,13 @@ function deselectAllQR(){
 }
 
 function updateQRCount(){
-    document.getElementById('qrSelectedCount').textContent=`${qrSelectedProducts.size} artikelen geselecteerd`;
+    const selectedList=products.filter(p=>qrSelectedProducts.has(p.id));
+    const withoutCode=selectedList.filter(p=>!p.barcode||p.barcode.trim()==='').length;
+    let text=`${qrSelectedProducts.size} artikelen geselecteerd`;
+    if(withoutCode>0){
+        text+=` (${withoutCode} zonder code)`;
+    }
+    document.getElementById('qrSelectedCount').textContent=text;
 }
 
 function selectLabelFormat(format){
@@ -1409,7 +2066,7 @@ async function getNextDMCode(){
     products.forEach(p=>{
         if(p.barcode&&p.barcode.startsWith('DM-')){
             const num=parseInt(p.barcode.replace('DM-',''),10);
-            if(num>maxNum)maxNum=num;
+            if(!isNaN(num)&&num>maxNum)maxNum=num;
         }
     });
     return maxNum+1;
@@ -1422,24 +2079,33 @@ async function generateQRLabels(){
     const saveToNotion=document.getElementById('qrSaveToNotion')?.checked||false;
     const selected=products.filter(p=>qrSelectedProducts.has(p.id));
     
+    // Tel items zonder barcode
+    const itemsWithoutCode=selected.filter(p=>!p.barcode||p.barcode.trim()==='');
+    
+    if(itemsWithoutCode.length>0&&saveToNotion){
+        const proceed=confirm(`${itemsWithoutCode.length} artikel(en) hebben nog geen QR code.\n\nNieuwe DM-codes worden gegenereerd en opgeslagen in Notion.\n\nDoorgaan?`);
+        if(!proceed)return;
+    }
+    
     showLoading(true);
     
     // Generate DM codes for products without one
     let nextCode=await getNextDMCode();
     const productsWithCodes=[];
+    let savedCount=0;
     
     for(const p of selected){
         let code=p.barcode;
         
-        // Generate new code if needed
-        if(!code||!code.startsWith('DM-')){
+        // Generate new DM code only if product has NO barcode at all
+        if(!code||code.trim()===''){
             code='DM-'+String(nextCode).padStart(4,'0');
             nextCode++;
             
             // Save to Notion if enabled
             if(saveToNotion){
                 try{
-                    debugLog('QR code opslaan in Notion',{id:p.id,code});
+                    debugLog('QR code opslaan in Notion',{id:p.id,name:p.name,code});
                     await notionRequest(`/pages/${p.id}`,'PATCH',{
                         properties:{' ID (barcode)':{rich_text:[{text:{content:code}}]}}
                     });
@@ -1447,13 +2113,19 @@ async function generateQRLabels(){
                     p.barcode=code;
                     const idx=products.findIndex(x=>x.id===p.id);
                     if(idx>=0)products[idx].barcode=code;
+                    savedCount++;
                 }catch(e){
                     debugLog('QR code opslaan mislukt',e.message);
+                    showToast(`Fout bij ${p.name}`,'error');
                 }
             }
         }
         
         productsWithCodes.push({...p,qrCode:code});
+    }
+    
+    if(savedCount>0){
+        showToast(`${savedCount} QR codes opgeslagen in Notion`);
     }
     
     showLoading(false);
@@ -1651,6 +2323,484 @@ window.onerror=function(msg,url,line,col,error){
     debugLog('JS ERROR',{msg,line,col});
     console.error('Global error:',msg,line,col,error);
 };
+
+// === BLUETOOTH PRINTER (Niimbot B3S) ===
+let bluetoothDevice=null;
+let printerCharacteristic=null;
+let printerConnected=false;
+
+// Niimbot B3S UUIDs (gevonden via reverse engineering)
+const NIIMBOT_SERVICE='e7810a71-73ae-499d-8c15-faa9aef0c3f2';
+const NIIMBOT_CHAR_WRITE='bef8d6c9-9c21-4c9e-b632-bd58c1009f9f';
+const NIIMBOT_CHAR_NOTIFY='bef8d6c9-9c21-4c9e-b632-bd58c1009f9f';
+
+function updatePrinterStatus(connected,name=''){
+    printerConnected=connected;
+    const icon=document.getElementById('printerStatusIcon');
+    const text=document.getElementById('printerStatusText');
+    const sub=document.getElementById('printerStatusSub');
+    const btn=document.getElementById('printerConnectBtn');
+    const testBtn=document.getElementById('printerTestBtn');
+    const niimbotBtn=document.getElementById('niimbotPrintBtn');
+    
+    if(connected){
+        icon.textContent='🟢';
+        text.textContent=name||'Verbonden';
+        sub.textContent='Printer klaar';
+        btn.textContent='🔌 Verbreek verbinding';
+        btn.onclick=disconnectBluetoothPrinter;
+        testBtn.style.display='block';
+        if(niimbotBtn)niimbotBtn.style.opacity='1';
+    }else{
+        icon.textContent='⚪';
+        text.textContent='Niet verbonden';
+        sub.textContent='Klik om te verbinden';
+        btn.textContent='🔗 Verbind Printer';
+        btn.onclick=connectBluetoothPrinter;
+        testBtn.style.display='none';
+        if(niimbotBtn)niimbotBtn.style.opacity='0.5';
+    }
+}
+
+async function connectBluetoothPrinter(){
+    if(!navigator.bluetooth){
+        showToast('Bluetooth niet beschikbaar','error');
+        alert('Web Bluetooth is niet beschikbaar in deze browser.\n\nGebruik Chrome op Android voor Bluetooth printen.');
+        return;
+    }
+    
+    debugLog('Zoeken naar Bluetooth printers...');
+    showLoading(true);
+    
+    try{
+        // Zoek naar Niimbot printers
+        bluetoothDevice=await navigator.bluetooth.requestDevice({
+            filters:[
+                {namePrefix:'B3S'},
+                {namePrefix:'Niimbot'},
+                {namePrefix:'B21'},
+                {namePrefix:'D11'},
+                {namePrefix:'D110'}
+            ],
+            optionalServices:[NIIMBOT_SERVICE,'49535343-fe7d-4ae5-8fa9-9fafd205e455']
+        });
+        
+        debugLog('Printer gevonden',{name:bluetoothDevice.name});
+        
+        bluetoothDevice.addEventListener('gattserverdisconnected',()=>{
+            debugLog('Printer verbinding verbroken');
+            updatePrinterStatus(false);
+            showToast('Printer verbinding verbroken','error');
+        });
+        
+        const server=await bluetoothDevice.gatt.connect();
+        debugLog('GATT verbonden');
+        
+        // Zoek de juiste service
+        let service;
+        try{
+            service=await server.getPrimaryService(NIIMBOT_SERVICE);
+        }catch(e){
+            // Probeer alternatieve service
+            service=await server.getPrimaryService('49535343-fe7d-4ae5-8fa9-9fafd205e455');
+        }
+        debugLog('Service gevonden');
+        
+        // Zoek write characteristic
+        const chars=await service.getCharacteristics();
+        debugLog('Characteristics',chars.map(c=>c.uuid));
+        
+        // Neem de eerste writable characteristic
+        for(const char of chars){
+            if(char.properties.write||char.properties.writeWithoutResponse){
+                printerCharacteristic=char;
+                debugLog('Write characteristic gevonden',char.uuid);
+                break;
+            }
+        }
+        
+        if(!printerCharacteristic){
+            throw new Error('Geen write characteristic gevonden');
+        }
+        
+        updatePrinterStatus(true,bluetoothDevice.name);
+        showToast(`${bluetoothDevice.name} verbonden`);
+        debugLog('Printer klaar');
+        
+    }catch(e){
+        console.error('Bluetooth error:',e);
+        debugLog('Bluetooth fout',e.message);
+        if(e.message.includes('cancelled')){
+            showToast('Verbinding geannuleerd');
+        }else{
+            showToast('Verbinding mislukt: '+e.message,'error');
+        }
+    }
+    showLoading(false);
+}
+
+function disconnectBluetoothPrinter(){
+    if(bluetoothDevice&&bluetoothDevice.gatt.connected){
+        bluetoothDevice.gatt.disconnect();
+    }
+    bluetoothDevice=null;
+    printerCharacteristic=null;
+    updatePrinterStatus(false);
+    showToast('Printer verbroken');
+}
+
+// Niimbot packet helpers
+function niimbotPacket(type,data){
+    const packet=new Uint8Array(data.length+6);
+    packet[0]=0x55;  // Header 1
+    packet[1]=0x55;  // Header 2
+    packet[2]=type;  // Command type
+    packet[3]=data.length; // Data length
+    for(let i=0;i<data.length;i++){
+        packet[4+i]=data[i];
+    }
+    // Checksum (XOR of type, length, and data)
+    let checksum=type^data.length;
+    for(let i=0;i<data.length;i++){
+        checksum^=data[i];
+    }
+    packet[packet.length-2]=checksum;
+    packet[packet.length-1]=0xAA; // Footer
+    return packet;
+}
+
+async function sendToPrinter(data){
+    if(!printerCharacteristic){
+        throw new Error('Printer niet verbonden');
+    }
+    
+    // Stuur in chunks van 20 bytes (BLE MTU limit)
+    const chunkSize=20;
+    for(let i=0;i<data.length;i+=chunkSize){
+        const chunk=data.slice(i,Math.min(i+chunkSize,data.length));
+        await printerCharacteristic.writeValue(chunk);
+        await new Promise(r=>setTimeout(r,20)); // Kleine pauze tussen chunks
+    }
+}
+
+async function testPrintLabel(){
+    if(!printerConnected){
+        showToast('Verbind eerst de printer','error');
+        return;
+    }
+    
+    showLoading(true);
+    debugLog('Test print starten...');
+    
+    try{
+        // Genereer een test QR code image
+        const canvas=document.createElement('canvas');
+        const ctx=canvas.getContext('2d');
+        const size=240; // 30mm @ 203dpi = ~240 pixels
+        canvas.width=size;
+        canvas.height=size;
+        
+        // Witte achtergrond
+        ctx.fillStyle='#ffffff';
+        ctx.fillRect(0,0,size,size);
+        
+        // Genereer QR code
+        const qr=generateQRMatrix('TEST-001');
+        const cellSize=Math.floor(size/qr.length);
+        const offset=Math.floor((size-cellSize*qr.length)/2);
+        
+        ctx.fillStyle='#000000';
+        for(let y=0;y<qr.length;y++){
+            for(let x=0;x<qr[y].length;x++){
+                if(qr[y][x]){
+                    ctx.fillRect(offset+x*cellSize,offset+y*cellSize,cellSize,cellSize);
+                }
+            }
+        }
+        
+        // Omzetten naar printable formaat
+        const imageData=ctx.getImageData(0,0,size,size);
+        await printImageToNiimbot(imageData,size,size);
+        
+        showToast('Test label geprint!');
+        debugLog('Test print voltooid');
+        
+    }catch(e){
+        console.error('Print error:',e);
+        debugLog('Print fout',e.message);
+        showToast('Print mislukt: '+e.message,'error');
+    }
+    showLoading(false);
+}
+
+// QR code generator using qrcode-generator library
+function generateQRMatrix(text){
+    const qr=qrcode(0,'M'); // 0 = auto version, M = medium error correction
+    qr.addData(text);
+    qr.make();
+    
+    const size=qr.getModuleCount();
+    const matrix=[];
+    for(let y=0;y<size;y++){
+        const row=[];
+        for(let x=0;x<size;x++){
+            row.push(qr.isDark(y,x)?1:0);
+        }
+        matrix.push(row);
+    }
+    return matrix;
+}
+
+// Genereer QR code als canvas
+function generateQRCanvas(text,size=200){
+    const qr=qrcode(0,'M');
+    qr.addData(text);
+    qr.make();
+    
+    const moduleCount=qr.getModuleCount();
+    const cellSize=Math.floor(size/moduleCount);
+    const actualSize=cellSize*moduleCount;
+    
+    const canvas=document.createElement('canvas');
+    canvas.width=actualSize;
+    canvas.height=actualSize;
+    const ctx=canvas.getContext('2d');
+    
+    // Witte achtergrond
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,actualSize,actualSize);
+    
+    // Zwarte modules
+    ctx.fillStyle='#000000';
+    for(let y=0;y<moduleCount;y++){
+        for(let x=0;x<moduleCount;x++){
+            if(qr.isDark(y,x)){
+                ctx.fillRect(x*cellSize,y*cellSize,cellSize,cellSize);
+            }
+        }
+    }
+    
+    return canvas;
+}
+
+// Genereer QR code als data URL
+function generateQRDataURL(text,size=200){
+    const canvas=generateQRCanvas(text,size);
+    return canvas.toDataURL('image/png');
+}
+
+async function printImageToNiimbot(imageData,width,height){
+    // Omzetten naar 1-bit bitmap (zwart/wit)
+    const rowBytes=Math.ceil(width/8);
+    const bitmap=new Uint8Array(rowBytes*height);
+    
+    for(let y=0;y<height;y++){
+        for(let x=0;x<width;x++){
+            const idx=(y*width+x)*4;
+            const gray=(imageData.data[idx]+imageData.data[idx+1]+imageData.data[idx+2])/3;
+            if(gray<128){ // Zwart pixel
+                const byteIdx=y*rowBytes+Math.floor(x/8);
+                const bitIdx=7-(x%8);
+                bitmap[byteIdx]|=(1<<bitIdx);
+            }
+        }
+    }
+    
+    debugLog('Bitmap gegenereerd',{width,height,bytes:bitmap.length});
+    
+    // Stuur start print commando
+    await sendToPrinter(niimbotPacket(0x01,[0x01])); // Start session
+    await new Promise(r=>setTimeout(r,100));
+    
+    // Stuur label info (breedte/hoogte)
+    const labelInfo=new Uint8Array([
+        (width>>8)&0xFF,width&0xFF,
+        (height>>8)&0xFF,height&0xFF
+    ]);
+    await sendToPrinter(niimbotPacket(0x13,labelInfo));
+    await new Promise(r=>setTimeout(r,100));
+    
+    // Stuur bitmap data in chunks
+    const chunkHeight=1; // 1 rij per keer
+    for(let y=0;y<height;y+=chunkHeight){
+        const rowData=bitmap.slice(y*rowBytes,(y+chunkHeight)*rowBytes);
+        const packet=new Uint8Array(rowData.length+2);
+        packet[0]=(y>>8)&0xFF;
+        packet[1]=y&0xFF;
+        packet.set(rowData,2);
+        await sendToPrinter(niimbotPacket(0x85,packet));
+        
+        // Progress
+        if(y%20===0){
+            debugLog('Print progress',{row:y,total:height});
+        }
+    }
+    
+    // Stuur end print commando
+    await sendToPrinter(niimbotPacket(0xF3,[0x01])); // Print & feed
+    await new Promise(r=>setTimeout(r,500));
+}
+
+async function printToNiimbot(){
+    if(!printerConnected){
+        showToast('Verbind eerst de printer (Instellingen)','error');
+        return;
+    }
+    
+    if(qrSelectedProducts.size===0){
+        showToast('Selecteer artikelen','error');
+        return;
+    }
+    
+    const saveToNotion=document.getElementById('qrSaveToNotion')?.checked||false;
+    const selectedProducts=products.filter(p=>qrSelectedProducts.has(p.id));
+    
+    // Tel items zonder barcode
+    const itemsWithoutCode=selectedProducts.filter(p=>!p.barcode||p.barcode.trim()==='');
+    
+    if(itemsWithoutCode.length>0&&saveToNotion){
+        const proceed=confirm(`${itemsWithoutCode.length} artikel(en) hebben nog geen QR code.\n\nNieuwe DM-codes worden gegenereerd en opgeslagen in Notion.\n\nDoorgaan?`);
+        if(!proceed){showLoading(false);return;}
+    }
+    
+    const status=document.getElementById('niimbotPrintStatus');
+    status.textContent=`Voorbereiden...`;
+    showLoading(true);
+    
+    // Genereer QR codes voor items zonder
+    let nextCode=await getNextDMCode();
+    const productsWithCodes=[];
+    let savedCount=0;
+    
+    for(const p of selectedProducts){
+        let code=p.barcode;
+        
+        if(!code||code.trim()===''){
+            code='DM-'+String(nextCode).padStart(4,'0');
+            nextCode++;
+            
+            if(saveToNotion){
+                try{
+                    debugLog('QR code opslaan in Notion',{id:p.id,name:p.name,code});
+                    await notionRequest(`/pages/${p.id}`,'PATCH',{
+                        properties:{' ID (barcode)':{rich_text:[{text:{content:code}}]}}
+                    });
+                    p.barcode=code;
+                    const idx=products.findIndex(x=>x.id===p.id);
+                    if(idx>=0)products[idx].barcode=code;
+                    savedCount++;
+                }catch(e){
+                    debugLog('QR code opslaan mislukt',e.message);
+                }
+            }
+        }
+        
+        productsWithCodes.push({...p,qrCode:code});
+    }
+    
+    if(savedCount>0){
+        showToast(`${savedCount} QR codes opgeslagen in Notion`);
+    }
+    
+    status.textContent=`Printen: 0/${productsWithCodes.length}...`;
+    debugLog('Niimbot print starten',{count:productsWithCodes.length});
+    
+    try{
+        for(let i=0;i<productsWithCodes.length;i++){
+            const product=productsWithCodes[i];
+            status.textContent=`Printen: ${i+1}/${productsWithCodes.length}...`;
+            
+            // Genereer label image
+            const canvas=await generateLabelCanvas(product);
+            const ctx=canvas.getContext('2d');
+            const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+            
+            // Print naar Niimbot
+            await printImageToNiimbot(imageData,canvas.width,canvas.height);
+            
+            // Korte pauze tussen labels
+            await new Promise(r=>setTimeout(r,300));
+        }
+        
+        status.textContent=`✓ ${productsWithCodes.length} labels geprint`;
+        showToast(`${productsWithCodes.length} labels geprint!`);
+        debugLog('Niimbot print voltooid');
+        
+    }catch(e){
+        console.error('Print error:',e);
+        debugLog('Print fout',e.message);
+        status.textContent='Print mislukt: '+e.message;
+        showToast('Print mislukt','error');
+    }
+    showLoading(false);
+}
+
+async function generateLabelCanvas(product){
+    const format=document.querySelector('input[name="labelFormat"]:checked').value;
+    
+    // Formaten voor Niimbot B3S @ 203 DPI
+    const formats={
+        square:{w:200,h:200},  // ~25x25mm
+        small:{w:320,h:240},   // ~40x30mm
+        medium:{w:400,h:240}   // ~50x30mm
+    };
+    const size=formats[format]||formats.small;
+    
+    const canvas=document.createElement('canvas');
+    canvas.width=size.w;
+    canvas.height=size.h;
+    const ctx=canvas.getContext('2d');
+    
+    // Witte achtergrond
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,size.w,size.h);
+    
+    // Bepaal barcode text (gebruik qrCode als beschikbaar, anders barcode)
+    const barcodeText=product.qrCode||product.barcode||product.id.replace(/-/g,'').slice(0,12);
+    
+    // Genereer QR code
+    const qrSize=format==='square'?160:140;
+    const qr=generateQRMatrix(barcodeText);
+    const cellSize=Math.floor(qrSize/qr.length);
+    
+    ctx.fillStyle='#000000';
+    const qrX=format==='square'?(size.w-cellSize*qr.length)/2:10;
+    const qrY=format==='square'?10:(size.h-cellSize*qr.length)/2;
+    
+    for(let y=0;y<qr.length;y++){
+        for(let x=0;x<qr[y].length;x++){
+            if(qr[y][x]){
+                ctx.fillRect(qrX+x*cellSize,qrY+y*cellSize,cellSize,cellSize);
+            }
+        }
+    }
+    
+    // Tekst toevoegen (niet bij vierkant formaat - te weinig ruimte)
+    if(format!=='square'){
+        ctx.font='bold 16px Arial';
+        ctx.fillStyle='#000000';
+        const textX=qrX+qrSize+10;
+        const textMaxWidth=size.w-textX-10;
+        
+        // Product naam (kort)
+        const name=product.name.length>20?product.name.substring(0,18)+'...':product.name;
+        ctx.fillText(name,textX,30,textMaxWidth);
+        
+        // Barcode
+        ctx.font='12px monospace';
+        ctx.fillText(barcodeText,textX,50,textMaxWidth);
+    }else{
+        // Bij vierkant alleen barcode onder QR
+        ctx.font='10px monospace';
+        ctx.textAlign='center';
+        ctx.fillText(barcodeText.slice(-8),size.w/2,size.h-10);
+    }
+    
+    return canvas;
+}
+
+// Init printer status
+updatePrinterStatus(false);
 </script>
 </body>
 </html>
